@@ -1,0 +1,139 @@
+(* Extended Backus-Naur Form (EBNF) for Mini-ML
+
+   Terminal are either excerpts of concrete syntax between double
+   quotes, e.g. ";", or start with a capital letter.
+
+   Non-terminals start with a small letter.
+
+   {non_terminal TERMINAL ...}+ : A non-empty sequence of
+                                  non-terminal separated by a terminal
+
+   {non_terminal TERMINAL ...}* : A possibly empty sequence of
+                                  non-terminals separated by terminal
+
+   non_terminal+                : A non-empty sequence of non-terminals
+
+   non_terminal*                : A possibly empty sequence of non-terminals
+*)
+
+program ::= statements EOF
+
+statements ::=
+  "let" let_bindings statements
+| "let" "rec" let_bindings statements
+| /* empty */
+
+(* Recursive definitions *)
+
+let_rec_bindings ::= {let_rec_binding "and" ...}+
+
+let_rec_binding ::=
+  Ident pattern+ "=" expr
+| Ident "=" expr
+| non_rec_lhs "=" expr
+
+(* Non-recursive definitions *)
+
+let_bindings ::= {let_binding "and" ...}+
+
+let_binding ::=
+  Ident pattern* "=" expr
+| non_rec_lhs "=" expr
+
+(* Patterns *)
+
+non_rec_lhs ::=
+  common_pattern
+| pattern cons cons_pat
+| {pattern "," ...}+
+
+common_pattern ::=
+  "_"
+| "()"
+| "[" {cons_pat ";" ...}* "]"
+| "(" ptuple ")"
+
+ptuple ::= {cons_pat ";" ...}+
+
+unit ::= "(" ")"
+
+cons_pat ::=
+  pattern "::" cons_pat
+| pattern
+
+pattern ::=
+  common_pattern
+| Ident
+| "(" cons_pat ")"
+
+(* Expressions *)
+
+expr ::=
+  let_expr
+| cat_expr
+| {cat_expr "," ...}+
+| conditional
+| fun_expr
+
+let_expr ::=
+  "let" let_bindings "in" expr
+| "let" "rec" let_rec_bindings "in" expr
+
+conditional ::= "if" expr "then" expr "else" expr
+
+fun_expr ::= "fun" pattern+ "->" expr
+
+cat_expr ::=
+  cons_expr "^" cat_expr
+| cons_expr
+
+cons_expr ::=
+  disj_expr "::" cons_expr
+| disj_expr
+
+disj_expr ::=
+  disj_expr "||" conj_expr
+| conj_expr
+
+conj_expr ::=
+  conj_expr "&&" comp_expr
+| comp_expr
+
+comp_expr ::=
+  comp_expr "<"  add_expr
+| comp_expr "<=" add_expr
+| comp_expr ">"  add_expr
+| comp_expr ">=" add_expr
+| comp_expr "="  add_expr
+| comp_expr "<>" add_expr
+| add_expr
+
+add_expr ::=
+  add_expr "+" mult_expr
+| add_expr "-" mult_expr
+| mult_expr
+
+mult_expr ::=
+  mult_expr "*"   unary_expr
+| mult_expr "div" unary_expr
+| mult_expr "mod" unary_expr
+| unary_expr
+
+unary_expr ::=
+  "-" core_expr
+| "not" core_expr
+| primary_expr
+
+primary_expr ::=
+  primary_expr core_expr
+| core_expr
+
+core_expr ::=
+  Int
+| Ident
+| String
+| "()"
+| "false"
+| "true"
+| "[" {expr ";" ...}* "]"
+| "(" expr ")"

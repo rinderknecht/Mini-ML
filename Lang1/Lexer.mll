@@ -1,19 +1,9 @@
-(* Lexer specification for Slang, the STICK language, to be processed
-   by [ocamllex]. *)
+(* Lexer specification for Mini-ML, to be processed by [ocamllex]. *)
 
 {
 (* START HEADER *)
 
-open Utils
-
-(* Hack to roll back one lexeme in the current semantic action *)
-
-let rollback lexbuf =
-  let open Lexing in
-  let len = String.length (lexeme lexbuf) in
-  lexbuf.lex_curr_pos <- lexbuf.lex_curr_pos - len;
-  lexbuf.lex_curr_p <-
-    {lexbuf.lex_curr_p with pos_cnum = lexbuf.lex_curr_p.pos_cnum - len}
+open! Utils
 
 (* Lexical errors *)
 
@@ -98,19 +88,6 @@ let add map (key,value) = String.Map.add key value map
 
 let kwd_map = List.fold_left add String.Map.empty keywords
 
-(* Making an integer or rational number from its decimal notation *)
-
-let format_num s =
-  match String.index s '.' with
-    index ->
-      let len        = String.length s in
-      let integral   = Str.first_chars s index
-      and fractional = Str.last_chars s (len-index-1) in
-      let num        = Z.of_string (integral ^ fractional)
-      and den        = Z.of_string ("1" ^ String.make (len-index-1) '0')
-      in Token.Frac (s, Q.make num den)
-  | exception Not_found -> Token.Int (Z.of_string s)
-
 (* Resetting file name and line number (according to #line directives) *)
 
 let reset_file ~file buffer =
@@ -124,9 +101,15 @@ let reset_line lnum buffer =
 let reset ~file ?(line=1) buffer =
   reset_file ~file buffer; reset_line line buffer
 
-(* The global stack of included files *)
-
-let included = ref []
+(* Hack to roll back one lexeme in the current semantic action *)
+(*
+let rollback lexbuf =
+  let open Lexing in
+  let len = String.length (lexeme lexbuf) in
+  lexbuf.lex_curr_pos <- lexbuf.lex_curr_pos - len;
+  lexbuf.lex_curr_p <-
+    {lexbuf.lex_curr_p with pos_cnum = lexbuf.lex_curr_p.pos_cnum - len}
+*)
 
 (* END HEADER *)
 }
@@ -145,8 +128,7 @@ let ident      = lowercase ident_char*
 let uident     = uppercase ident_char*
 let digit      = ['0'-'9']
 let integer    = '0' | ['1'-'9'] digit*
-let decimal    = digit+ '.' digit+
-let number     = integer | decimal
+let number     = integer
 let escaped    = "\\n" | "\\\"" | "\\?" | "\\\\" | "\\a"
                  | "\\b" | "\\f" | "\\n" | "\\r" | "\\t" | "\\v"
                  | "\\0" digit digit
@@ -156,12 +138,9 @@ let string     = str_char*
 (* Rules *)
 
 rule scan = parse
-  newline { Lexing.new_line lexbuf;
-            scan lexbuf }
+  newline { Lexing.new_line lexbuf; scan lexbuf }
 | blank+  { scan lexbuf }
 
-| "<-" { Token.ONE_SYN  }
-| "<=" { Token.MANY_SYN }
 | "->" { Token.ARROW    }
 | "::" { Token.CONS     }
 | "^"  { Token.CAT      }
@@ -170,7 +149,7 @@ rule scan = parse
 | "<>" { Token.NE       }
 | "<"  { Token.LT       }
 | ">"  { Token.GT       }
-| "=<" { Token.LE       }
+| "<=" { Token.LE       }
 | ">=" { Token.GE       }
 
 | "&&" { Token.BOOL_AND }
@@ -180,11 +159,6 @@ rule scan = parse
 | "+"  { Token.PLUS     }
 | "/"  { Token.DIV      }
 | "*"  { Token.MULT     }
-
-| "-." { Token.QMINUS   }
-| "+." { Token.QPLUS    }
-| "/." { Token.QDIV     }
-| "*." { Token.QMULT    }
 
 | "("  { Token.LPAR     }
 | ")"  { Token.RPAR     }
@@ -196,14 +170,14 @@ rule scan = parse
 
 | "_"  { Token.WILD     }
 
-| '"' (string as s) '"' { Token.String s }
+| '"' (string as s) '"' { Token.Str s }
 
 | '0' digit+ as n {
     let msg = Printf.sprintf "Leading zeros in %s are not allowed." n
     in error lexbuf msg
   }
 
-| number as n  { format_num n }
+| number as n  { Token.Int (Z.of_string n) }
 
 | ident as id {
     match String.Map.find id kwd_map with
@@ -277,16 +251,10 @@ type filename = string
 let output_token buffer chan token =
   let open Lexing in
   let conc = Token.to_string token in
-  match token with
-    Token.Label (outer_reg, _) ->
-      let start_pos = Region.start_pos outer_reg
-      and stop_pos  = Region.stop_pos  outer_reg
-      in Printf.fprintf chan "%s-%s: %s\n%!"
-          (Pos.compact start_pos) (Pos.compact stop_pos) conc
-  | _ -> let start_pos = buffer.lex_start_p
-        and curr_pos  = buffer.lex_curr_p
-        in Printf.fprintf chan "%s-%s: %s\n%!"
-            (Pos.compact start_pos) (Pos.compact curr_pos) conc
+  let start_pos = buffer.lex_start_p
+  and curr_pos  = buffer.lex_curr_p
+  in Printf.fprintf chan "%s-%s: %s\n%!"
+       (Pos.compact start_pos) (Pos.compact curr_pos) conc
 
 let trace file =
   try

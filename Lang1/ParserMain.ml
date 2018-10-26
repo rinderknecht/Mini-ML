@@ -1,13 +1,40 @@
-(* Pilot for the parser of Slang *)
+(* Pilot for the parser of Mini-ML *)
+
+open! EvalOpt (* Reads the command-line options: Effectful! *)
 
 (* Error printing and exception tracing *)
 
+let () = Printexc.record_backtrace true
 
-let cin = open_in pp_input
+let external_ text =
+  Utils.highlight (Printf.sprintf "External error: %s" text); exit 1;;
+
+(* Path to the Mini-ML standard library *)
+
+let lib_path =
+  match EvalOpt.libs with
+      [] -> ""
+  | libs -> let mk_I dir path = Printf.sprintf " -I %s%s" dir path
+            in List.fold_right mk_I libs ""
+
+(* Opening the input channel and setting the lexing engine *)
+
+let basename = Filename.basename EvalOpt.input
+
+let prefix =
+  if EvalOpt.input = "-" then "temp"
+  else Filename.remove_extension basename
+
+let cin = open_in EvalOpt.input
 let buffer = Lexing.from_channel cin
 let () = Lexer.reset ~file:basename buffer
 
-let tokeniser = Lexer.get_token ?log:None
+(* Tokeniser *)
+
+let tokeniser =
+  if Utils.String.Set.mem "lexer" EvalOpt.debug then
+    Lexer.get_token ~log:(stdout, Lexer.output_token buffer)
+  else Lexer.get_token ?log:None
 
 let () =
   try

@@ -1,45 +1,36 @@
-(* Lexical tokens for the STICK language *)
-
-type syn_kind = V | Ge | Gf | Gate
+(* Lexical tokens for Mini-ML *)
 
 type file = {start_pos: Pos.t; name: string}
 
 type t =
 (* Symbols *)
 
-  ONE_SYN  (* "<-" *)
-| MANY_SYN (* "<=" *)
-| ARROW    (* "->" *)
+  ARROW    (* "->" *)
 | CONS     (* "::" *)
 | CAT      (* "^"  *)
 
 (* Arithmetics *)
 
-| MINUS   (* "-" *)
-| PLUS    (* "+" *)
-| DIV     (* "/" *)
-| MULT    (* "*" *)
-
-| QMINUS  (* "-." *)
-| QPLUS   (* "+." *)
-| QDIV    (* "/." *)
-| QMULT   (* "*." *)
+| MINUS    (* "-" *)
+| PLUS     (* "+" *)
+| DIV      (* "/" *)
+| MULT     (* "*" *)
 
 (* Compounds *)
 
-| LPAR    (* "(" *)
-| RPAR    (* ")" *)
-| LBRACK  (* "[" *)
-| RBRACK  (* "]" *)
+| LPAR     (* "(" *)
+| RPAR     (* ")" *)
+| LBRACK   (* "[" *)
+| RBRACK   (* "]" *)
 
 (* Separators *)
 
-| COMMA   (* "," *)
-| SEMI    (* ";" *)
+| COMMA    (* "," *)
+| SEMI     (* ";" *)
 
 (* Wildcard *)
 
-| WILD    (* "_" *)
+| WILD     (* "_" *)
 
 (* Comparisons *)
 
@@ -55,11 +46,9 @@ type t =
 
 (* Identifiers, labels, numbers and strings *)
 
-| Ident  of string
-| Label  of (Region.t * (Region.t * string))
-| Int    of Z.t
-| Frac   of (string * Q.t)
-| String of string
+| Ident of string
+| Int   of Z.t
+| Str   of string
 
 (* Keywords *)
 
@@ -76,20 +65,8 @@ type t =
 | Then
 | True
 
-| Net
-| Fuse
-| Input
-| Output
-| Node
-| Gate
-| Ge
-| Gf
-| V
-
 (* Virtual tokens *)
 
-| CPP_include of file (* #include "file"   *)
-| CPP_line_2  of file (* # <line> "file" 2 *)
 | EOF                 (* End of file       *)
 
 type token = t

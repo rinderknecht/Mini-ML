@@ -1,12 +1,6 @@
-(* Simple lexer for the STICK language *)
+(* Simple lexer for the Mini-ML language *)
 
 type filename = string
-
-(* Hack to roll back one lexeme in Ocamllex buffer (should be safe if
-   used in the semantic actions of the regular expression recognising
-   the lexeme rolled back. Very useful! *)
-
-val rollback: Lexing.lexbuf -> unit
 
 (* Error reporting *)
 
@@ -47,3 +41,10 @@ val trace:           filename -> unit
 val prerr:           kind:string -> diagnostic -> unit
 val error_to_string: kind:string -> message -> Region.t -> string
 val output_token:    Lexing.lexbuf -> out_channel -> Token.t -> unit
+
+(* Hack to roll back one lexeme in Ocamllex buffer (should be safe if
+   used in the semantic actions of the regular expression recognising
+   the lexeme rolled back. *)
+(*
+val rollback: Lexing.lexbuf -> unit
+*)
