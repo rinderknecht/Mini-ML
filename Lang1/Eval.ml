@@ -529,14 +529,6 @@ and eval_call_expr state (reg,(func,arg)) =
       thread, Value.set_region reg v
   | _ -> raise (Type_error (State.{state with thread}, __LOC__))
 
-and get_name state = function
-  Value.Str s -> s
-| _ -> raise (Type_error (state, __LOC__))
-
-and to_bool state = function
-  Value.Bool (_,b) -> b
-| _ -> raise (Type_error (state, __LOC__))
-
 and eval_core_expr state =
   let thread = state.State.thread in function
               Int z -> thread, Value.Int z

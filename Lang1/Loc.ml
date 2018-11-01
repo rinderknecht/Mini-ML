@@ -21,7 +21,7 @@ let line   {line;   _} = line
 let column {column; _} = column
 let offset {column; _} = column - 1
 
-(* Modifications *)
+(* Updates *)
 
 let set_file loc ~file   = {loc with file}
 let add_line loc ~offset = {loc with line = loc.line + offset}
@@ -44,6 +44,13 @@ let leq loc1 loc2 =
 let eq loc1 loc2 =
   if loc1.file = loc2.file || loc1.file = "" || loc2.file = "" then
     loc1.line = loc2.line && loc1.column = loc2.column
+  else raise (Incomparable (loc1, loc2))
+
+let compare loc1 loc2 =
+  if loc1.file = loc2.file || loc1.file = "" || loc2.file = "" then
+    match loc2.line - loc1.line with
+          0 -> loc2.column - loc1.column
+    | delta -> delta
   else raise (Incomparable (loc1, loc2))
 
 (* Predicates *)

@@ -7,3 +7,4 @@ val out:       string option
 
 val debug:     Utils.String.Set.t
 val libs:      string list
+val raw_edits: bool

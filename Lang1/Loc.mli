@@ -8,24 +8,24 @@ type loc = t
 
 (* Making locations *)
 
-val make: file:string -> line:int -> column:int -> t
-val from_pos: Lexing.position -> t
+val make     : file:string -> line:int -> column:int -> t
+val from_pos : Lexing.position -> t
 
-val min: file:string -> t
-val max: file:string -> t
+val min : file:string -> t
+val max : file:string -> t
 
 (* Projections *)
 
-val file:   t -> string
-val line:   t -> int
-val column: t -> int
-val offset: t -> int
+val file   : t -> string
+val line   : t -> int
+val column : t -> int
+val offset : t -> int
 
-(* Modifications *)
+(* Updates *)
 
-val set_file: t -> file:string -> t
-val add_line: t -> offset:int -> t
-val add_col:  t -> offset:int -> t
+val set_file : t -> file:string -> t
+val add_line : t -> offset:int  -> t
+val add_col  : t -> offset:int  -> t
 
 (* Comparisons
 
@@ -41,15 +41,16 @@ val add_col:  t -> offset:int -> t
 
 exception Incomparable of t * t
 
-val lt:  t -> t -> bool
-val leq: t -> t -> bool
-val eq:  t -> t -> bool
+val lt      : t -> t -> bool
+val leq     : t -> t -> bool
+val eq      : t -> t -> bool
+val compare : t -> t -> int
 
 (* Predicates *)
 
-val is_min: t -> bool
-val is_max: t -> bool
+val is_min : t -> bool
+val is_max : t -> bool
 
 (* Conversion to [string] *)
 
-val to_string: ?emacs:bool -> t -> string
+val to_string : ?emacs:bool -> t -> string

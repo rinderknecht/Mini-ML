@@ -1,3 +1,5 @@
+(*module C = Compile*)
+
 (* Pilot for the compiler/interpreter of Mini-ML *)
 
 let id = Utils.id
@@ -96,44 +98,43 @@ let () =
 
         let state = Eval.eval ?out:out_chan ast in
         () in
-    ()
+
     (* Compiling Mini-ML to OCaml *)
-(*
+
     let () =
       match EvalOpt.compile with
              None -> ()
       | Some file ->
-          let state = Compile.{
-            trans = Pass1;
+          let open Compile in
+          let state = {
+            trans = Trans.Id;
             input = Filename.basename EvalOpt.input;
-            tco   = EvalOpt.tco;
-            log   = EvalOpt.log;
-            stats = EvalOpt.stats
           } in
 
           let edit =
-            let open Compile in
-            (if EvalOpt.tco then Edit.compile_cps else Edit.compile)
+             TEdit.compile
           @@ get_edit
-          @@ add_functor
-          @@ (if EvalOpt.no_stdlib then id else add_prologue)
+(*          @@ add_functor
+          @@ (if EvalOpt.no_stdlib then id else add_prologue)*)
           @@ edit_ast ~debug:EvalOpt.debug ast
-          @@ add_end
-            (state, Edit.stop) in
+(*          @@ add_end*)
+            (state, TEdit.stop) in
 
           (* I/O maps *)
 
           let ml = if Utils.String.Set.mem "compiler" EvalOpt.debug
                    then file
-                   else let open Filename in
+                   else let open! Filename in
                         get_temp_dir_name () ^ dir_sep ^ basename file in
 
-          let io =  Edit.init_IO Compile.to_string
-                 |> Edit.add Compile.Pass2 ~in_:EvalOpt.input ~out:ml
-                 |> Edit.add Compile.Pass1 ~in_:EvalOpt.input ~out:ml in
+          let io =  TEdit.init_IO Trans.to_string
+          (*|> TEdit.add Compile.Pass2 ~in_:EvalOpt.input ~out:ml*)
+                    |> TEdit.add Trans.Id ~in_:EvalOpt.input ~out:ml in
 
-         (* Optionally adding the runtime environment (RTE) edits *)
+          let edits = [edit] in (* TEMPORARY *)
 
+          (* Optionally adding the runtime environment (RTE) edits *)
+(*
           let io, edits =
             if EvalOpt.rte then
               let ml_rte =
@@ -158,15 +159,15 @@ let () =
                 (state, Edit.stop)
               in [edit; edit_rte]
             else io, [edit] in
-
+*)
           (* Checking all edits *)
 
           let () = if Utils.String.Set.mem "editor" EvalOpt.debug then
-                    (print_endline "\nEDITS"; Edit.show io edits) in
+                    (print_endline "\nEDITS"; TEdit.show io edits) in
 
           let check edit =
-            try Edit.check edit with (* The following are internal errors. *)
-              Edit.Invalid (loc1, loc2) ->
+            try TEdit.check edit with (* The following are internal errors. *)
+              TEdit.Invalid (loc1, loc2) ->
                 let msg = Printf.sprintf "Decreasing locations %s and %s.\n"
                            (Loc.to_string loc1) (Loc.to_string loc2)
                 in internal msg
@@ -180,18 +181,18 @@ let () =
           (* Optimising the edits *)
 
           let desc, edits =
-            Edit.build ~opt:(not EvalOpt.raw_edits) io edits in
+            TEdit.build ~opt:(not EvalOpt.raw_edits) io edits in
 
           let () = if Utils.String.Set.mem "editor" EvalOpt.debug
                    && not EvalOpt.raw_edits
                    then (print_endline "\nOPTIMISED EDITS";
-                         Edit.show io edits) in
+                         TEdit.show io edits) in
 
           (* Applying the edits *)
 
-          List.iter (Edit.apply desc) edits;
-          Edit.close_out_desc io desc in
-    () *)
+          List.iter (TEdit.apply desc) edits;
+          TEdit.close_out_desc io desc in
+    ()
   with
   (* Lexing errors *)
 

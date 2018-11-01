@@ -11,10 +11,11 @@ let help () =
   print_endline "where <input>.ml is the Mini-ML source file,";
   print_endline "and each <option> (if any) is one of the following:";
   print_endline "  -I <paths>                Library paths (colon-separated)";
-  print_endline "  -o, --out=<michel>.son    Output Michelson (default \
+  print_endline "  -o, --out=<michel>.son    Compile to Michelson (default \
                                              <input>.son)";
-  print_endline "  -c <file>.ml              Compile to Michelson";
+  print_endline "  -c <file>.ml              Compile to OCaml";
   print_endline "  -e, --eval                Evaluate <input>.ml";
+  print_endline "  -r, --raw-edits           No optimisation of edits";
   print_endline "  -d, --debug=<target>      cmdline, lexer, compiler, ";
   print_endline "                            parser, unparsing, norm, eval";
   print_endline "  -v, --version             Print the version number on \
@@ -34,6 +35,7 @@ and compile   = ref None
 and output    = ref None
 and debug     = ref Utils.String.Set.empty
 and libs      = ref []
+and raw_edits = ref false
 
 let set_opt var err =
   Some (fun x -> if !var = None then var := Some x else raise (Getopt.Error err))
@@ -49,15 +51,16 @@ let add_debug d =
 
 let specs =
   let open! Getopt in [
-    'I',    nolong, None, Some add_path;
-    'o',     "out", set output (Some ""),
-                    set_opt output "Multiple source files";
-    'c',    nolong, set compile (Some ""),
-                    set_opt compile "Multiple OCaml outputs";
-    'e',    "eval", set eval true, None;
-    'd',   "debug",         None, Some add_debug;
-    'h',    "help",    Some help, None;
-    'v', "version", Some version, None;
+    'I',      nolong, None, Some add_path;
+    'o',       "out", set output (Some ""),
+                      set_opt output "Multiple source files";
+    'c',      nolong, set compile (Some ""),
+                      set_opt compile "Multiple OCaml outputs";
+    'e',      "eval", set eval true, None;
+    'r', "raw-edits", set raw_edits true, None;
+    'd',     "debug",         None, Some add_debug;
+    'h',      "help",    Some help, None;
+    'v',   "version", Some version, None;
   ]
 ;;
 
@@ -99,6 +102,7 @@ let print_opt () =
   Printf.printf "out       = %s\n" (string_of quote !output);
   Printf.printf "compile   = %s\n" (string_of quote !compile);
   Printf.printf "eval      = %B\n" !eval;
+  Printf.printf "raw_edits = %b\n" !raw_edits;
   Printf.printf "debug     = %s\n" debug_str;
   Printf.printf "libs      = %s\n" (string_of_path !libs)
 ;;
@@ -148,6 +152,7 @@ if out <> None && not !eval && compile = None then
 let eval      = !eval
 and debug     = !debug
 and libs      = !libs
+and raw_edits = !raw_edits
 ;;
 
 if Utils.String.Set.mem "cmdline" debug then
@@ -157,6 +162,7 @@ begin
   Printf.printf "out       = \"%s\"\n" (string_of quote out);
   Printf.printf "compile   = %s\n"     (string_of quote compile);
   Printf.printf "eval      = %B\n"     eval;
+  Printf.printf "raw_edits = %B\n"     raw_edits;
   Printf.printf "debug     = %s\n"     debug_str;
   Printf.printf "I         = %s\n"     (string_of_path libs)
 end
