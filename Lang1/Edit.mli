@@ -49,6 +49,7 @@ module type Trans =
     type trans = t
 
     val compare   : t -> t -> int
+    val equal     : t -> t -> bool
     val to_string : t -> string
   end
 
@@ -186,9 +187,13 @@ module type S =
 
     type filename = string
 
+    module TransSet : Set.S with type elt = trans
+    module TransMap : Map.S with type key = trans
+    module FileMap  : Map.S with type key = filename
+
     type binding = {
-      lift : (filename, trans PolySet.t) PolyMap.t;
-      drop : (trans, filename) PolyMap.t
+      lift : TransSet.t FileMap.t;
+      drop : filename TransMap.t
     }
 
     type io_map = {
@@ -254,8 +259,8 @@ module type S =
        abstraction due to Ocamllex).
     *)
 
-    type in_desc  = (trans, Loc.t * Lexing.lexbuf) PolyMap.t
-    type out_desc = (trans, out_channel) PolyMap.t
+    type in_desc  = (Loc.t * Lexing.lexbuf) TransMap.t
+    type out_desc = out_channel TransMap.t
     type desc     = {in_desc : in_desc; out_desc : out_desc}
 
 

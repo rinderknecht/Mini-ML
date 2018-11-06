@@ -11,6 +11,8 @@ module Trans =
 
     let compare = compare
 
+    let equal = (=)
+
     let to_string = function
       Id -> "Id"
   end

@@ -10,6 +10,7 @@ module type Trans =
     type trans = t
 
     val compare   : t -> t -> int
+    val equal     : t -> t -> bool
     val to_string : t -> string
   end
 
@@ -48,9 +49,13 @@ module type S =
 
     type filename = string
 
+    module TransSet : Set.S with type elt = trans
+    module TransMap : Map.S with type key = trans
+    module FileMap  : Map.S with type key = filename
+
     type binding = {
-      lift : (filename, trans PolySet.t) PolyMap.t;
-      drop : (trans, filename) PolyMap.t
+      lift : TransSet.t FileMap.t;
+      drop : filename TransMap.t
     }
 
     type io_map = {
@@ -65,8 +70,8 @@ module type S =
 
     val print_io_map : io_map -> unit
 
-    type in_desc  = (trans, Loc.t * Lexing.lexbuf) PolyMap.t
-    type out_desc = (trans, out_channel) PolyMap.t
+    type in_desc  = (Loc.t * Lexing.lexbuf) TransMap.t
+    type out_desc = out_channel TransMap.t
     type desc     = {in_desc: in_desc; out_desc: out_desc}
 
 
@@ -80,6 +85,10 @@ module Make (Trans: Trans) =
   struct
 
     type trans = Trans.t
+
+    module TransSet = Set.Make (Trans)
+    module TransMap = Map.Make (Trans)
+    module FileMap  = Map.Make (String)
 
     (* A low-level edition DSL.
 
@@ -130,17 +139,16 @@ module Make (Trans: Trans) =
     exception Invalid of Loc.t * Loc.t
 
     let check edit =
-      let open PolyMap in
       let rec chk map = function
-          Null -> () | Write (_,_,edit) | Goto (_,_,edit) ->
+        Null -> () | Write (_,_,edit) | Goto (_,_,edit) ->
           chk map edit
-        | Copy (trans,loc,edit) | Skip (trans,loc,edit) ->
+      | Copy (trans,loc,edit) | Skip (trans,loc,edit) ->
           try
-            if Loc.leq (find trans map) loc
-            then chk (add trans loc map) edit
-            else raise (Invalid (find trans map, loc))
-          with Not_found -> chk (add trans loc map) edit
-      in chk empty edit
+            if Loc.leq (TransMap.find trans map) loc
+            then chk (TransMap.add trans loc map) edit
+            else raise (Invalid (TransMap.find trans map, loc))
+          with Not_found -> chk (TransMap.add trans loc map) edit
+      in chk TransMap.empty edit
 
     (* Filters: A high-level edition DSL *)
 
@@ -254,8 +262,8 @@ module Make (Trans: Trans) =
     type filename = string
 
     type binding = {
-      lift : (filename, trans PolySet.t) PolyMap.t;
-      drop : (trans, filename) PolyMap.t
+      lift : TransSet.t FileMap.t;
+      drop : filename TransMap.t
     }
 
     type io_map = {
@@ -266,26 +274,24 @@ module Make (Trans: Trans) =
 
     let init_IO mk_str =
       let empty = {
-        lift = PolyMap.create ~cmp:String.compare;
-        drop = PolyMap.empty
+        lift = FileMap.empty;
+        drop = TransMap.empty
       }
       in {input=empty; output=empty; to_string=mk_str}
 
     let add_in trans file io =
-      let open PolyMap in
-      let t_set = try find file io.input.lift with
-                    Not_found -> PolySet.empty in
-      let lift  = add file (PolySet.add trans t_set) io.input.lift
-      and drop  = add trans file io.input.drop
-      in {io with input={lift;drop}}
+      let t_set = try FileMap.find file io.input.lift with
+                    Not_found -> TransSet.empty in
+      let lift  = FileMap.add file (TransSet.add trans t_set) io.input.lift
+      and drop  = TransMap.add trans file io.input.drop
+      in {io with input = {lift; drop}}
 
     let add_out trans file io =
-      let open PolyMap in
-      let t_set = try find file io.output.lift with
-                    Not_found -> PolySet.empty in
-      let lift  = add file (PolySet.add trans t_set) io.output.lift
-      and drop  = add trans file io.output.drop
-      in {io with output={lift;drop}}
+      let t_set = try FileMap.find file io.output.lift with
+                    Not_found -> TransSet.empty in
+      let lift  = FileMap.add file (TransSet.add trans t_set) io.output.lift
+      and drop  = TransMap.add trans file io.output.drop
+      in {io with output = {lift; drop}}
 
     let add trans ~in_ ~out io = add_out trans out (add_in trans in_ io)
 
@@ -297,14 +303,14 @@ module Make (Trans: Trans) =
     let print_file to_string file tree =
       let show_trans tree = print_string (to_string tree ^ ", ")
       in Printf.printf "%s -> {" file;
-      PolySet.iter show_trans tree;
+      TransSet.iter show_trans tree;
       print_string "}"
 
     let print_bindings to_string {lift;drop} =
       print_endline " * Lift:";
-      PolyMap.iter (print_file to_string) lift;
+      FileMap.iter (print_file to_string) lift;
       print_endline " * Drop:";
-      PolyMap.iter (print_trans to_string) drop
+      TransMap.iter (print_trans to_string) drop
 
     let print_io_map io =
       print_endline "Displaying input:";
@@ -317,26 +323,26 @@ module Make (Trans: Trans) =
     let string_of_copy ?(emacs=true) io trans loc =
       Printf.sprintf "*** Copy up to %s:%s:%s into %s"
         (io.to_string trans)
-        (Filename.basename (PolyMap.find trans io.input.drop))
+        (Filename.basename (TransMap.find trans io.input.drop))
         (Loc.to_string ~emacs loc)
-        (Filename.basename (PolyMap.find trans io.output.drop))
+        (Filename.basename (TransMap.find trans io.output.drop))
 
     let string_of_skip ?(emacs=true) io trans loc =
       Printf.sprintf "*** Skip up to %s:%s:%s"
         (io.to_string trans)
-        (Filename.basename (PolyMap.find trans io.input.drop))
+        (Filename.basename (TransMap.find trans io.input.drop))
         (Loc.to_string ~emacs loc)
 
     let string_of_goto io trans char =
       Printf.sprintf "*** Go to next character %s:%s:'%s'"
         (io.to_string trans)
-        (Filename.basename (PolyMap.find trans io.input.drop))
+        (Filename.basename (TransMap.find trans io.input.drop))
         (Char.escaped char)
 
     let string_of_write io trans text =
       Printf.sprintf "*** Write to %s:%s:\n%s"
         (io.to_string trans)
-        (Filename.basename (PolyMap.find trans io.output.drop))
+        (Filename.basename (TransMap.find trans io.output.drop))
         (if text = "" then "<empty string>" else text)
 
     let rec string_of_edit ?(emacs=true) io = function
@@ -367,11 +373,11 @@ module Make (Trans: Trans) =
 
     let eq_input io trans1 trans2 =
       let in_drop = io.input.drop
-      in PolyMap.(find trans1 in_drop = find trans2 in_drop)
+      in TransMap.(find trans1 in_drop = find trans2 in_drop)
 
     let eq_output io trans1 trans2 =
       let out_drop = io.output.drop
-      in PolyMap.(find trans1 out_drop = find trans2 out_drop)
+      in TransMap.(find trans1 out_drop = find trans2 out_drop)
 
     let eq_io io trans1 trans2 =
       eq_input io trans1 trans2 && eq_output io trans1 trans2
@@ -593,8 +599,8 @@ module Make (Trans: Trans) =
 
     (* Mapping edits to their descriptors (buffers or channels) *)
 
-    type  in_desc = (trans, Loc.t * Lexing.lexbuf) PolyMap.t
-    type out_desc = (trans, out_channel) PolyMap.t
+    type in_desc  = (Loc.t * Lexing.lexbuf) TransMap.t
+    type out_desc = out_channel TransMap.t
 
     type desc = {
        in_desc :  in_desc;
@@ -678,16 +684,15 @@ module Make (Trans: Trans) =
     *)
 
     let mk_in_desc (io: io_map) (eqc: Partition.t) : in_desc =
-      let open! PolyMap in
-      let delta trans file ~acc =
+      let delta trans file acc =
         let repr = Partition.repr trans eqc in
-        try add trans (find repr acc) acc with
+        try TransMap.add trans (TransMap.find repr acc) acc with
           Not_found ->
             let buf = Lexing.from_channel (open_in file) in
             let desc = Loc.min ~file:"", buf in
-            let acc = add repr desc acc in
-            if repr = trans then acc else add trans desc acc
-      in fold_inc delta io.input.drop ~init:empty
+            let acc = TransMap.add repr desc acc in
+            if Trans.equal repr trans then acc else TransMap.add trans desc acc
+      in TransMap.fold delta io.input.drop TransMap.empty
 
     (* The value of [mk_out_desc io] is an output descriptor (of type
        [out_desc]), mapping transformations to output channels. First,
@@ -698,21 +703,23 @@ module Make (Trans: Trans) =
        maps). *)
 
     let mk_out_desc (io: io_map) : out_desc =
-      let open! PolyMap in
-      let apply _ file ~acc =
-        add file (if file = "-" then stdout else open_out file) acc in
-      let out_map = create ~cmp:String.compare in
-      let out_file_map = fold_inc apply io.output.drop ~init:out_map in
-      let delta trans file ~acc = add trans (find file out_file_map) acc
-      in fold_inc delta io.output.drop ~init:empty
+      let apply _ file acc =
+        FileMap.add file (if file = "-" then stdout else open_out file) acc in
+      let out_map = FileMap.empty in
+      let out_file_map =
+        TransMap.fold apply io.output.drop out_map in
+      let delta trans file acc =
+        TransMap.add trans (FileMap.find file out_file_map) acc
+      in TransMap.fold delta io.output.drop TransMap.empty
 
     let close_out_desc (io: io_map) (desc: desc): unit =
       let io_map = io.output.drop
       and desc_map = desc.out_desc in
-      let open PolyMap in
-      iter (fun key file ->
-              if file <> "-" then
-                try find key desc_map |> close_out with Not_found -> ()) io_map
+      TransMap.iter
+        (fun key file ->
+           if file <> "-" then
+             try TransMap.find key desc_map |> close_out with Not_found -> ())
+        io_map
 
     (* The call [mk_desc io eqc] calls [mk_in_desc] and [mk_out_desc]
        to create a complete descriptor according the I/O map [io] and
@@ -756,8 +763,8 @@ module Make (Trans: Trans) =
 
     let build ?(opt=false) (io: io_map) (edits: edit list) =
       let init =
-        let apply trans _ ~acc = Partition.equiv trans trans acc
-        in PolyMap.fold_inc apply io.input.drop ~init:Partition.empty in
+        let apply trans _ acc = Partition.equiv trans trans acc
+        in TransMap.fold apply io.input.drop Partition.empty in
       let apply edit acc =
         match reduce io edit with
           Null -> acc
@@ -803,7 +810,7 @@ rule scan loc action stop = parse
 and scan_until loc action char_stop = parse
   _ as c { action c;
            let loc' = update loc lexbuf in
-           if char_stop = c then loc'
+           if   char_stop = c then loc'
            else scan_until loc' action char_stop lexbuf }
 | eof    { loc }
 
@@ -827,10 +834,10 @@ and scan_until loc action char_stop = parse
   *)
 
     let common (desc: desc) trans stop action =
-      let loc, buffer = PolyMap.find trans desc.in_desc in
+      let loc, buffer = TransMap.find trans desc.in_desc in
       if Loc.lt loc stop then
         let loc' = scan loc action stop buffer in
-        {desc with in_desc = PolyMap.add trans (loc',buffer) desc.in_desc}
+        {desc with in_desc = TransMap.add trans (loc',buffer) desc.in_desc}
       else desc
 
     let rec apply ?(emacs=true) ?io (desc: desc) edit =
@@ -840,18 +847,18 @@ and scan_until loc action char_stop = parse
                | Some io_map -> show ~emacs io_map [edit] in
       match edit with
         Copy (trans, stop, edit) ->
-          let cout = PolyMap.find trans desc.out_desc
+          let cout = TransMap.find trans desc.out_desc
           in apply (common desc trans stop (output_char cout)) edit
       | Skip (trans, stop, edit) ->
           apply (common desc trans stop nothing) edit
       | Goto (trans, char, edit) ->
-          let loc, buffer = PolyMap.find trans desc.in_desc in
+          let loc, buffer = TransMap.find trans desc.in_desc in
           let loc' = scan_until loc nothing char buffer in
           let desc =
-            {desc with in_desc = PolyMap.add trans (loc',buffer) desc.in_desc}
+            {desc with in_desc = TransMap.add trans (loc',buffer) desc.in_desc}
           in apply desc edit
       | Write (trans, text, edit) ->
-          let cout = PolyMap.find trans desc.out_desc
+          let cout = TransMap.find trans desc.out_desc
           in output_string cout text; apply desc edit
       | Null -> flush_all ()
   end

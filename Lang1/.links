@@ -1,11 +1,4 @@
 $HOME/git/OCaml-build/Makefile
 
-$HOME/git/Red-Black_Trees/RedBlack.mli
-$HOME/git/Red-Black_Trees/RedBlack.ml
-$HOME/git/Red-Black_Trees/PolySet.mli
-$HOME/git/Red-Black_Trees/PolySet.ml
-$HOME/git/Red-Black_Trees/PolyMap.mli
-$HOME/git/Red-Black_Trees/PolyMap.ml
-
 $HOME/git/UnionFind/Partition.mli
 $HOME/git/UnionFind/Partition3.ml
