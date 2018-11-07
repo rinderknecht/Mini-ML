@@ -149,21 +149,20 @@ list__(X):
 (* Main *)
 
 program:
-  statements eof                                                        { $1,$2 }
+  seq(statement) eof                                                    { $1,$2 }
 
-statements:
-  reg(kwd_let         let_bindings     {$1,$2})    statements {    Let $1 :: $2 }
-| reg(kwd_let kwd_rec let_rec_bindings {$1,$2,$3}) statements { LetRec $1 :: $2 }
-| /* empty */                                                 {              [] }
+statement:
+  reg(kwd_let         let_bindings     {$1,$2})                     {    Let $1 }
+| reg(kwd_let kwd_rec let_rec_bindings {$1,$2,$3})                  { LetRec $1 }
 
 (* Recursive definitions *)
 
 let_rec_bindings:
-  nsepseq(let_rec_binding,  kwd_and)                                  { $1 }
+  nsepseq(let_rec_binding, kwd_and)                                        { $1 }
 
 let_rec_binding:
   ident nseq(pattern) eq expr                 { $1, Region.ghost, norm $2 $3 $4 }
-| ident eq fun_expr                           { $1,           $2,            $3 }
+| ident               eq fun_expr             { $1,           $2,            $3 }
 
 (* Non-recursive definitions *)
 
