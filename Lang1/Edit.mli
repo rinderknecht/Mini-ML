@@ -1,24 +1,44 @@
 (* Editing text files (multiple inputs, multiple outputs) *)
 
-(* First, we define a tiny Domain Specific Language (DSL) with an
-   abstract syntax whose interpretation results in editing the text of
-   possibly multiple files, but not in-place: several output files may
-   be produced as a result. Edits on the same input file can be
-   defined separately and this module provides a function which tries
-   to merge pairwise edits that are sequentially composable, in order
-   to minimise the number of passes on a given input source.
+
+(* Edits are parameterised by transformations *)
+
+module type Trans =
+  sig
+    type t
+    type trans = t
+
+    val compare   : t -> t -> int
+    val equal     : t -> t -> bool
+    val to_string : t -> string
+  end
+
+(* We define a tiny Domain Specific Language (DSL) with an abstract
+   syntax whose interpretation results in editing the text of possibly
+   multiple files, but not in-place: several output files may be
+   produced as a result. Edits on the same input file can be defined
+   separately and this module provides a function which tries to merge
+   pairwise edits that are sequentially composable, in order to
+   minimise the number of passes on a given input source.
 
      In the following documentation, this DSL is qualified as being
    "low-level" in contexts of another DSL (see filters below), called
    "high-level".
+*)
 
-     The following abstract type [t] defines the edits. The function
-   applying edits (see [apply] in the postlude) must be able to map
-   transforms to their lexing buffers and output channels,
-   respectively for input and output files.
+module type S =
+  sig
+    (* The following abstract type [edit] defines the edits. The
+       function applying edits (see [apply] in the postlude) must be
+       able to map transforms to their lexing buffers and output
+       channels, respectively for input and output files. *)
 
-     Edits are modelled by the values of the following function calls
-   and constants:
+    type t
+    type edit = t
+    type trans
+
+    (* Edits are modelled by the values of the following function
+       calls and constants:
 
      * [null] is the empty edit;
 
@@ -41,29 +61,13 @@
        (included) is reached, followed by the edit [edit] to be
        applied next. Note that this edit, contrary to the others, is
        not static, as it depends on the contents of the input text.
-*)
+    *)
 
-module type Trans =
-  sig
-    type t
-    type trans = t
-
-    val compare   : t -> t -> int
-    val equal     : t -> t -> bool
-    val to_string : t -> string
-  end
-
-module type S =
-  sig
-    type t
-    type edit = t
-    type trans
-
-    val null:  t
-    val copy:  trans -> Loc.t  -> edit -> edit
-    val skip:  trans -> Loc.t  -> edit -> edit
-    val write: trans -> string -> edit -> edit
-    val goto:  trans -> char   -> edit -> edit
+    val null  : t
+    val copy  : trans -> Loc.t  -> edit -> edit
+    val skip  : trans -> Loc.t  -> edit -> edit
+    val write : trans -> string -> edit -> edit
+    val goto  : trans -> char   -> edit -> edit
 
     (* The value of the call [check edit] is [true] if, and only if,
        the locations enabling the individual edits are strictly increasing
@@ -73,13 +77,13 @@ module type S =
 
     exception Invalid of Loc.t * Loc.t
 
-    val check: edit -> unit
+    val check : edit -> unit
 
     (* Filters
 
        It is convenient to specify edits in a manner more abstract
-       than a series of copies, writes and skips (see type ['a t] above),
-       in other words, by means of a "high-level" DSL.
+       than a series of copies, writes and skips (see type [edit]
+       above), in other words, by means of a "high-level" DSL.
 
        The idea is to have the default semantics be a copy of the input
        to the output, like in XSLT, and only specify the
@@ -133,7 +137,7 @@ module type S =
        Note that, for example, calls to [insert] and [overwrite] could be
        expressed solely by means of calls to [patch], but we retain the
        former functions for ease of use, as this is consistent with the
-       purpose of the type ['a filter].
+       purpose of the type [filter].
 
        Some start locations of the editing instructions above are
        optional, meaning that, when missing, they apply to the current
@@ -157,39 +161,28 @@ module type S =
     val stop        :                                                   filter
 
     (* Compiling filters (i.e., high-level editing commands) to
-       (low-level) edits. Note that [compile_cps] is functionally
-       equivalent to [compile], but is implemented in Continuation-Passing
-       Style (CPS), implying that its calls use a constant amount of the
-       OS call stack. *)
+       (low-level) edits. *)
 
-    val compile     : filter -> edit
-    val compile_cps : filter -> edit
-
-    (* Values of the type ['a io_map] contain information about the
-       mapping of transformations (of type ['a]) to file names (of type
-       [file]), and vice-versa, both for inputs and outputs.
-
-       The type ['a binding] describes such a two-way mapping. The field
-       [lift] contains a map from file names to a set of transformations
-       (stored in a red-black tree, see module [PolySet]), because a file
-       can be used by multiple transformations, either as input or
-       output. Conversely, the field [drop] of type ['a binding] holds a
-       map from transformations (of type ['a]) to file names, because each
-       transformation is associated to one file for input, and one for
-       output.
-
-       Technical note: We do not use the [Map] module from the standard
-       library because we need the polymorphism on the transformations,
-       hence the need for our custom-made module [PolySet], despite the
-       lack of static guarantee on the comparison of transformations, and
-       possible lack of balance of the tree in the worst case.
-    *)
+    val compile : filter -> edit
 
     type filename = string
 
     module TransSet : Set.S with type elt = trans
     module TransMap : Map.S with type key = trans
     module FileMap  : Map.S with type key = filename
+
+    (* Values of the type [io_map] contain information about the
+       mapping of transformations (of type [trans]) to file names, and
+       vice-versa, both for inputs and outputs.
+
+       The type [binding] describes such a two-way mapping. The field
+       [lift] contains a map from file names to a set of
+       transformations, because a file can be used by multiple
+       transformations, either as input or output. Conversely, the
+       field [drop] of type [binding] holds a map from transformations
+       (of type [trans]) to file names, because each transformation is
+       associated to one file for input, and one for output.
+    *)
 
     type binding = {
       lift : TransSet.t FileMap.t;
@@ -202,26 +195,27 @@ module type S =
       to_string : trans -> string
     }
 
-    (* The value of [init_IO mk_str] is an I/O map (of type ['a
-       io_map]), initialised with the function [mk_str] that provides a
-       string representing a transformation (therefore of type ['a ->
-       string]). *)
+    (* The value of [init_io mk_str] is an I/O map (of type [io_map]),
+       initialised with the function [mk_str] that provides a string
+       representing a transformation, of type [trans -> string]. *)
 
-    val init_IO : (trans -> string) -> io_map
+    val init_io : (trans -> string) -> io_map
 
-    (* The value of [add_in trans file io] is an updated version of
-       the I/O map [io] (of type ['a io_map]) with the transformation
-       [trans] and its corresponding input file name [file]. The dual
-       update, for output files, is done by [add_out]. *)
+    (* The value of [add trans ~in_ ~out io] is an updated version of
+       the I/O map [io] with the transformation [trans] and its
+       corresponding input file name [in_] and output file name
+       [out]. *)
 
     val add : trans -> in_:filename -> out:filename -> io_map -> io_map
 
     (* The call [show io edits] prints the edits [edits] interpreted
-       with respect to the I/O map [io]. *)
+       with respect to the I/O map [io]. The optional argument [emacs]
+       is set to [true] by default, meaning that horizontal offsets,
+       rather than column numbers, are used. *)
 
     val show : ?emacs:bool -> io_map -> edit list -> unit
 
-    (* Pretty-printing of I/O maps (of type ['a io_map]) *)
+    (* Pretty-printing of I/O maps (of type [io_map]) *)
 
     val print_io_map : io_map -> unit
 
@@ -252,12 +246,11 @@ module type S =
 
      * The output of an edit is an output channel. Contrary to inputs,
        this kind of descriptor is not a lexing buffer, because we
-       write in the file, not read with Ocamllex, and we also do not
+       write in the file, not read with ocamllex, and we also do not
        need the current location because we always resume writing
        where we left, as the current location is handled by the
        operating system (there is not an additional layer of
-       abstraction due to Ocamllex).
-    *)
+       abstraction due to ocamllex).  *)
 
     type in_desc  = (Loc.t * Lexing.lexbuf) TransMap.t
     type out_desc = out_channel TransMap.t
@@ -267,9 +260,9 @@ module type S =
     (* Making the descriptors and optionally optimising pptimising
        lists of edits by merging them pairwise whenever possible.
 
-       The value of [build io edits] is a pair whose first component is a
-       collection of I/O descriptors, of type ['a desc], mapping
-       transformations of type ['a] to input and output descriptors
+       The value of [build io edits] is a pair whose first component
+       is a collection of I/O descriptors, of type [desc], mapping
+       transformations of type [trans] to input and output descriptors
        (respectively, lexing buffers and output channels).
 
        If the call is [build ~opt:true io edits], then the second

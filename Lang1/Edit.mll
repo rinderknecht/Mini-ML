@@ -3,6 +3,7 @@
 {
 (* HEADER *)
 
+open! Utils
 
 module type Trans =
   sig
@@ -44,8 +45,7 @@ module type S =
     val copy_to_end : trans                                           -> filter
     val stop        :                                                   filter
 
-    val compile     : filter -> edit
-    val compile_cps : filter -> edit
+    val compile : filter -> edit
 
     type filename = string
 
@@ -64,7 +64,7 @@ module type S =
       to_string : trans -> string
     }
 
-    val init_IO : (trans -> string) -> io_map
+    val init_io : (trans -> string) -> io_map
     val add     : trans -> in_:filename -> out:filename -> io_map -> io_map
     val show    : ?emacs:bool -> io_map -> edit list -> unit
 
@@ -182,42 +182,54 @@ module Make (Trans: Trans) =
 
     let rec compile = function
       Insert (trans, Some loc, text, filter) ->
-        Copy  (trans, loc,
-        Write (trans, text, compile filter))
+       (copy  trans loc
+      <@ write trans text
+      <@ compile) filter
     | Insert (trans, None, text, filter) ->
-        Write (trans, text, compile filter)
+        write trans text (compile filter)
     | Overwrite (trans, loc, text, filter) ->
-        Copy (trans, loc,
-        Skip (trans, Loc.add_col loc ~offset:(String.length text),
-        Write (trans, text, compile filter)))
+       (copy  trans loc
+      <@ skip  trans (Loc.add_col loc ~offset:(String.length text))
+      <@ write trans text
+      <@ compile) filter
     | Patch (trans, Some start, stop, patch, filter) ->
-        Copy  (trans, start,
-        Skip  (trans, stop,
-        Write (trans, patch, compile filter)))
+       (copy  trans start
+      <@ skip  trans stop
+      <@ write trans patch
+      <@ compile) filter
     | Patch (trans, None, stop, patch, filter) ->
-        Skip  (trans, stop,
-        Write (trans, patch, compile filter))
+       (skip  trans stop
+      <@ write trans patch
+      <@ compile) filter
     | Delete (trans, Some start, stop, filter) ->
-        Copy (trans, start,
-        Skip (trans, stop, compile filter))
+       (copy trans start
+      <@ skip trans stop
+      <@ compile) filter
     | Delete (trans, None, stop, filter) ->
-        Skip (trans, stop, compile filter)
+        skip trans stop (compile filter)
     | Discard (trans, loc, filter) ->
-      Skip (trans, loc, compile filter)
+        skip trans loc (compile filter)
     | CopyTo (trans, loc, filter) ->
-        Copy (trans, loc, compile filter)
+        copy trans loc (compile filter)
     | SkipTo (trans, char, filter) ->
-        Goto (trans, char, compile filter)
+        goto trans char (compile filter)
     | CopyToEnd trans ->
-        Copy (trans, Loc.max ~file:"", Null)
-    | SkipToEnd (trans,filter) ->
-        Skip (trans, Loc.max ~file:"", compile filter)
+        copy trans (Loc.max ~file:"") Null
+    | SkipToEnd (trans, filter) ->
+        skip trans (Loc.max ~file:"") (compile filter)
     | Append (trans, text, filter) ->
-        Copy  (trans, Loc.max ~file:"",
-        Write (trans, text, compile filter))
+       (copy  trans (Loc.max ~file:"")
+      <@ write trans text
+      <@ compile) filter
     | Stop -> Null
 
-    (* Compiling in Continuation-Passing Style *)
+(*
+    (* Compiling in Continuation-Passing Style
+
+       The function [compile_cps] is functionally
+       equivalent to [compile], but is implemented in Continuation-Passing
+       Style (CPS), implying that its calls use a constant amount of the
+       OS call stack. *)
 
     let rec compile_cps k = function
       Insert (trans, Some loc, text, filter) ->
@@ -227,12 +239,12 @@ module Make (Trans: Trans) =
     | Overwrite (trans, loc, text, filter) ->
         compile_cps
           (fun v -> k (Copy  (trans, loc,
-                    Skip (trans, Loc.add_col loc ~offset:(String.length text),
+                    Skip  (trans, Loc.add_col loc ~offset:(String.length text),
                     Write (trans, text, v))))) filter
     | Patch (trans, Some start, stop, patch, filter) ->
         compile_cps
-          (fun v -> k (Copy (trans, start,
-                    Skip (trans, stop,
+          (fun v -> k (Copy  (trans, start,
+                    Skip  (trans, stop,
                     Write (trans, patch, v))))) filter
     | Patch (trans, None, stop, patch, filter) ->
         compile_cps (fun v -> k (Skip (trans, stop, Write (trans, patch, v)))) filter
@@ -252,10 +264,11 @@ module Make (Trans: Trans) =
         compile_cps (fun v -> k (Copy (trans, Loc.max ~file:"",
                               Write (trans, text, v)))) filter
     | CopyToEnd trans ->
-      k (Copy (trans, Loc.max ~file:"", Null))
+        k (Copy (trans, Loc.max ~file:"", Null))
     | Stop -> k Null
 
     let compile_cps filter = compile_cps Utils.id filter
+*)
 
     (* I/O maps and file bindings *)
 
@@ -272,12 +285,9 @@ module Make (Trans: Trans) =
       to_string : trans -> string
     }
 
-    let init_IO mk_str =
-      let empty = {
-        lift = FileMap.empty;
-        drop = TransMap.empty
-      }
-      in {input=empty; output=empty; to_string=mk_str}
+    let init_io mk_str =
+      let empty = {lift = FileMap.empty; drop = TransMap.empty}
+      in {input = empty; output = empty; to_string = mk_str}
 
     let add_in trans file io =
       let t_set = try FileMap.find file io.input.lift with
@@ -453,7 +463,7 @@ module Make (Trans: Trans) =
         else Skip (trans1, loc1, reduce io next)
     | Skip (trans1,loc1, (Skip (trans2,loc2,sub) as next)) when loc1 = loc2 ->
         if   eq_io io trans1 trans2
-        then reduce io (Skip(trans1,loc1,sub))
+        then reduce io (Skip (trans1,loc1,sub))
         else Skip (trans1, loc1, reduce io next)
 
     | Copy (trans1,stop1, (Copy (trans2,_,_) as next)) ->
@@ -461,14 +471,14 @@ module Make (Trans: Trans) =
         then reduce io next
         else Copy (trans1, stop1, reduce io next)
     | Copy (trans,stop, Write (_,"",next)) ->
-        reduce io (Copy(trans,stop,next))
+        reduce io (Copy (trans,stop,next))
 
     | Skip (trans1,stop1, (Skip (trans2,_,_) as next)) ->
         if   eq_input io trans1 trans2
         then reduce io next
         else Skip (trans1, stop1, reduce io next)
     | Skip (trans1,stop, Write (trans2,text,next)) ->
-        reduce io (Write(trans2,text,Skip(trans1,stop,next)))
+        reduce io (Write (trans2,text, Skip(trans1,stop,next)))
     | Skip (_,stop,_) when Loc.is_max stop -> Null
     | Skip (_,_,Null) -> Null
 
@@ -482,7 +492,7 @@ module Make (Trans: Trans) =
     | Skip  (trans,stop,edit) -> Skip  (trans, stop, reduce io edit)
     | Goto  (trans,char,edit) -> Goto  (trans, char, reduce io edit)
     | Write (trans,text,edit) -> Write (trans, text, reduce io edit)
-    | Null -> Null
+    | Null                    -> Null
 
     (* Merging pairs of edits
 
@@ -601,11 +611,7 @@ module Make (Trans: Trans) =
 
     type in_desc  = (Loc.t * Lexing.lexbuf) TransMap.t
     type out_desc = out_channel TransMap.t
-
-    type desc = {
-       in_desc :  in_desc;
-      out_desc : out_desc
-    }
+    type desc     = {in_desc : in_desc; out_desc : out_desc}
 
     (* The value of [mk_in_desc io eqc] is an input descriptor, that
        is, a map from transformations (whose type is [trans]) to the
@@ -705,21 +711,17 @@ module Make (Trans: Trans) =
     let mk_out_desc (io: io_map) : out_desc =
       let apply _ file acc =
         FileMap.add file (if file = "-" then stdout else open_out file) acc in
-      let out_map = FileMap.empty in
       let out_file_map =
-        TransMap.fold apply io.output.drop out_map in
+        TransMap.fold apply io.output.drop FileMap.empty in
       let delta trans file acc =
         TransMap.add trans (FileMap.find file out_file_map) acc
       in TransMap.fold delta io.output.drop TransMap.empty
 
     let close_out_desc (io: io_map) (desc: desc): unit =
-      let io_map = io.output.drop
-      and desc_map = desc.out_desc in
-      TransMap.iter
-        (fun key file ->
-           if file <> "-" then
-             try TransMap.find key desc_map |> close_out with Not_found -> ())
-        io_map
+      let apply key file =
+        if file <> "-" then
+          try TransMap.find key desc.out_desc |> close_out with Not_found -> ()
+      in TransMap.iter apply io.output.drop
 
     (* The call [mk_desc io eqc] calls [mk_in_desc] and [mk_out_desc]
        to create a complete descriptor according the I/O map [io] and

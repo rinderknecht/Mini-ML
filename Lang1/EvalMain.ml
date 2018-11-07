@@ -122,14 +122,8 @@ let () =
 
           (* I/O maps *)
 
-          let ml = if Utils.String.Set.mem "compiler" EvalOpt.debug
-                   then file
-                   else let open! Filename in
-                        get_temp_dir_name () ^ dir_sep ^ basename file in
-
-          let io =  TEdit.init_IO Trans.to_string
-          (*|> TEdit.add Compile.Pass2 ~in_:EvalOpt.input ~out:ml*)
-                    |> TEdit.add Trans.Id ~in_:EvalOpt.input ~out:ml in
+          let io =  TEdit.init_io Trans.to_string
+                    |> TEdit.add Trans.Id ~in_:EvalOpt.input ~out:file in
 
           let edits = [edit] in (* TEMPORARY *)
 

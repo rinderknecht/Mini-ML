@@ -16,7 +16,7 @@ let help () =
   print_endline "  -c <file>.ml              Compile to OCaml";
   print_endline "  -e, --eval                Evaluate <input>.ml";
   print_endline "  -r, --raw-edits           No optimisation of edits";
-  print_endline "  -d, --debug=<target>      cmdline, lexer, compiler, ";
+  print_endline "  -d, --debug=<target>      cmdline, lexer,";
   print_endline "                            parser, unparsing, norm, eval";
   print_endline "  -v, --version             Print the version number on \
                                              stdout and exit";
