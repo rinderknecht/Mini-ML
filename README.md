@@ -1,8 +1,8 @@
 # A series of programming languages for the compilation to Michelson
 
-In particular, two Mini-ML languages (strict subsets of OCaml) and
-their interpreter in OCaml. Some also have a translator to OCaml in
-case the Mini-ML evolves into a Domain-Specific Language.
+In particular, two Mini-ML languages and their interpreter in
+OCaml. Some also have a translator to OCaml in case the Mini-ML is not
+a strict subset of OCaml (e.g. is a Domain-Specific Language).
 
 # Build
 

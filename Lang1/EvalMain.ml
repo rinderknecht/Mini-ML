@@ -133,10 +133,8 @@ let () =
             if EvalOpt.rte then
               let ml_rte =
                 let open Filename in
-                if Utils.String.Set.mem "compiler" EvalOpt.debug
-                then Printf.sprintf "%s%s%sRTE.ml"
-                      (dirname file) dir_sep (remove_extension file |> basename)
-                else get_temp_dir_name () ^ dir_sep ^ basename file in
+                  Printf.sprintf "%s%s%sRTE.ml"
+                   (dirname file) dir_sep (remove_extension file |> basename) in
 
               Edit.add Compile.RTE ~in_:EvalOpt.input ~out:ml_rte io,
               let open Compile in

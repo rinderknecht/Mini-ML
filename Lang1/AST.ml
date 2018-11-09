@@ -10,16 +10,19 @@ type 'a reg = Region.t * 'a
 
 type kwd_and   = Region.t
 type kwd_else  = Region.t
+type kwd_end   = Region.t
 type kwd_false = Region.t
 type kwd_fun   = Region.t
 type kwd_if    = Region.t
 type kwd_in    = Region.t
 type kwd_let   = Region.t
+type kwd_match = Region.t
 type kwd_mod   = Region.t
 type kwd_not   = Region.t
 type kwd_rec   = Region.t
 type kwd_then  = Region.t
 type kwd_true  = Region.t
+type kwd_with  = Region.t
 
 (* Symbols *)
 
@@ -59,6 +62,7 @@ type rbra = Region.t  (* "]" *)
 
 type comma = Region.t  (* "," *)
 type semi  = Region.t  (* ";" *)
+type bar   = Region.t  (* "|" *)
 
 (* Wildcard *)
 
@@ -71,6 +75,10 @@ type var = string
 (* Non-empty comma-separated values *)
 
 type 'a csv = ('a, comma) nsepseq
+
+(* Bar-separated non-empty lists *)
+
+type 'a bsv = ('a, bar) nsepseq
 
 (* Semicolon-separated lists (possibly empty) *)
 
@@ -101,15 +109,16 @@ and let_bindings = (let_binding, kwd_and) nsepseq
 
 and let_binding = pattern * eq * expr
 
-and let_rec_bindings = (let_rec_fun_binding,  kwd_and) nsepseq
+and let_rec_bindings = (let_rec_binding,  kwd_and) nsepseq
 
-and let_rec_fun_binding  = var reg * eq * fun_expr
+and let_rec_binding  = var reg * eq * fun_expr
 
 and pattern =
   Ptuple of pattern csv reg
 | Plist  of pattern ssv bra reg
 | Pvar   of var reg
 | Punit  of unit__ reg
+| Pint   of Z.t reg
 | Pwild  of wild
 | Pcons  of (pattern * cons * pattern) reg
 | Ppar   of pattern par reg
@@ -119,7 +128,12 @@ and expr =
 | Fun     of fun_expr
 | If      of conditional reg
 | Tuple   of cat_expr csv reg
+| Match   of match_expr reg
 | CatExpr of cat_expr
+
+and match_expr = kwd_match * expr * kwd_with * cases * kwd_end
+
+and cases = (pattern * arrow * expr) bsv
 
 and let_expr =
   LetIn    of kwd_let           * let_bindings     * kwd_in * expr
@@ -243,7 +257,7 @@ and statement_to_string = function
 
 and let_rec_bindings_to_string bindings =
   let apply binding acc =
-    let str = let_rec_fun_binding_to_string binding in
+    let str = let_rec_binding_to_string binding in
     if acc = "" then str else Printf.sprintf "%s\nAnd %s" acc str
   in Utils.nsepseq_foldr apply bindings ""
 
@@ -256,18 +270,33 @@ and let_bindings_to_string bindings =
 and let_binding_to_string (pattern, _, expr) =
   Printf.sprintf "%s = %s" (pattern_to_string pattern) (expr_to_string expr)
 
-and let_rec_fun_binding_to_string ((_,var), _, expr) =
+and let_rec_binding_to_string ((_,var), _, expr) =
   Printf.sprintf "%s = %s" var (fun_expr_to_string expr)
 
 and expr_to_string = function
-  LetExpr (_,expr) -> let_expr_to_string expr
-|     CatExpr expr -> cat_expr_to_string expr
-|  Tuple (_,exprs) -> tuple_to_string (cat_expr_to_string) exprs
-|         Fun expr -> fun_expr_to_string expr
+        LetExpr (_,expr) -> let_expr_to_string expr
+|           CatExpr expr -> cat_expr_to_string expr
+|        Tuple (_,exprs) -> tuple_to_string (cat_expr_to_string) exprs
+|         Match (_,expr) -> match_expr_to_string expr
+|               Fun expr -> fun_expr_to_string expr
 | If (_,(_,e,_,e1,_,e2)) -> Printf.sprintf "If (%s, %s, %s)"
                               (expr_to_string e)
                               (expr_to_string e1)
                               (expr_to_string e2)
+
+and match_expr_to_string (_,expr,_,cases,_) =
+  Printf.sprintf "Match (%s, %s)" (expr_to_string expr)
+                                  (cases_to_string cases)
+
+and cases_to_string cases =
+  let apply case acc =
+    let str = case_to_string case in
+    if acc = "" then str else Printf.sprintf "%s\n| %s" acc str
+  in Utils.nsepseq_foldr apply cases ""
+
+and case_to_string (pattern, _arrow, expr) =
+  Printf.sprintf "%s -> %s" (pattern_to_string pattern)
+                            (expr_to_string expr)
 
 and fun_expr_to_string (_,(_,(_,var),_,expr)) =
   Printf.sprintf "Fun (%s, %s)" var (expr_to_string expr)
@@ -286,6 +315,7 @@ and pattern_to_string = function
 | Pvar (_,var)        -> var
 | Ppar (_,(_,p,_))    -> Printf.sprintf "(%s)" (pattern_to_string p)
 | Punit _             -> "()"
+| Pint (_,z)          -> Z.to_string z
 | Pwild _             -> "_"
 | Pcons (_,(p1,_,p2)) -> Printf.sprintf "(%s::%s)"
                           (pattern_to_string p1) (pattern_to_string p2)
@@ -394,7 +424,7 @@ and scanf_to_string = function
 
 let rec region_of_pattern = function
   Plist (r,_) | Ptuple (r,_) | Pvar (r,_) | Punit (r,_)
-| Pwild r | Pcons (r,_) | Ppar (r,_) -> r
+| Pint (r,_) | Pwild r | Pcons (r,_) | Ppar (r,_) -> r
 
 and region_of_unary_expr = function
   Neg (r,_) | Not (r,_) -> r
@@ -430,7 +460,7 @@ and region_of_cat_expr = function
 | ConsExpr e -> region_of_cons_expr e
 
 and region_of_expr = function
-  LetExpr (r,_) | Fun (r,_) | If (r,_) | Tuple (r,_) -> r
+  LetExpr (r,_) | Fun (r,_) | If (r,_) | Tuple (r,_) | Match (r,_) -> r
 | CatExpr e -> region_of_cat_expr e
 
 and region_of_core_expr = function
@@ -610,6 +640,7 @@ let print_sepseq sep print = function
 | Some seq -> print_nsepseq sep print seq
 
 let print_csv print = print_nsepseq "," print
+let print_bsv print = print_nsepseq "|" print
 let print_ssv print = print_sepseq  ";" print
 
 let print_token reg conc =
@@ -654,9 +685,9 @@ and print_let_binding undo (pattern,eq,expr) =
   else (print_token eq "="; print_expr undo expr)
 
 and print_let_rec_bindings undo bindings =
-  print_nsepseq "and" (print_let_rec_fun_binding undo) bindings
+  print_nsepseq "and" (print_let_rec_binding undo) bindings
 
-and print_let_rec_fun_binding undo (var,eq,expr) =
+and print_let_rec_binding undo (var,eq,expr) =
   print_let_binding undo (Pvar var, eq, Fun expr)
 
 and print_pattern = function
@@ -667,9 +698,11 @@ and print_pattern = function
     print_ssv print_pattern patterns;
     print_token rbra "]"
 | Pvar (reg,var) ->
-    Printf.printf "%s: Ident %s\n" (Region.compact reg) var
+    Printf.printf "%s: Pvar %s\n" (Region.compact reg) var
 | Punit (_,(lpar,rpar)) ->
     print_token lpar "("; print_token rpar ")"
+| Pint (reg,z) ->
+    print_token reg (Printf.sprintf "(Int %s)" (Z.to_string z))
 | Pwild wild ->
     print_token wild "_"
 | Pcons (_,(p1,c,p2)) ->
@@ -678,10 +711,11 @@ and print_pattern = function
     print_token lpar "("; print_pattern p; print_token rpar ")"
 
 and print_expr undo = function
-   LetExpr (_,e) -> print_let_expr undo e
-|       If (_,e) -> print_conditional undo e
-|  Tuple (_,csv) -> print_csv (print_cat_expr undo) csv
-|      CatExpr e -> print_cat_expr undo e
+  LetExpr (_,e) -> print_let_expr undo e
+|      If (_,e) -> print_conditional undo e
+| Tuple (_,csv) -> print_csv (print_cat_expr undo) csv
+|     CatExpr e -> print_cat_expr undo e
+|   Match (_,e) -> print_match_expr undo e
 | Fun (_,((kwd_fun,_,_,_) as f)) as e ->
     if undo then
       let patterns, arrow, expr = unparse' e in
@@ -690,6 +724,18 @@ and print_expr undo = function
       print_token arrow "->";
       print_expr undo expr
     else print_fun_expr undo f
+
+and print_match_expr undo (kwd_match, expr, kwd_with, cases, kwd_end) =
+  print_token kwd_match "(match";
+  print_expr undo expr;
+  print_token kwd_with "with";
+  print_bsv (print_case undo) cases;
+  print_token kwd_end ")"
+
+and print_case undo (pattern, arrow, expr) =
+  print_pattern pattern;
+  print_token arrow "->";
+  print_expr undo expr
 
 and print_let_expr undo = function
   LetIn (kwd_let, let_bindings, kwd_in, expr) ->
@@ -801,14 +847,12 @@ module FreeVars =
 
 module Vars = String.Set
 
-(* The value of the call [free_vars env ast] is the set of free
-   variables in the Abstract Syntax Tree [ast] in the environment
-   [env] (here, the environment is a set of variables with their
-   locations, _not_ a value of type [Env.t]). On the same register,
-   keep in mind also that the parameters [state] below are _not_ of
-   type [State.t], but, instead, are a pair made of the current
-   environment and the current set of free variables (only the latter
-   is threaded, whilst the former flows top-down only). *)
+(* Here, the environment is a set of variables with their locations,
+   _not_ a value of type [Env.t]). On the same register, keep in mind
+   also that the parameters [state] below are _not_ of type [State.t],
+   but, instead, are a pair made of the current environment and the
+   current set of free variables (only the latter is threaded, whilst
+   the former flows top-down only). *)
 
 let rec vars env (statements,_) =
   List.fold_left fv_statement (env, FreeVars.empty) statements
@@ -817,47 +861,48 @@ and fv_statement state = function
   Let    (_,(_,  bindings)) -> fv_let_bindings state bindings
 | LetRec (_,(_,_,bindings)) -> fv_let_rec_bindings state bindings
 
-and fv_let_bindings (env, _ as state) =
-  nsepseq_foldl (fv_let_binding env) state
-
-and fv_let_rec_bindings state bindings =
-  fv_let_rec_fun_bindings state bindings
-
-and fv_let_rec_fun_bindings (env, fv) bindings =
-  let env' =
-    nsepseq_foldl (fun a ((_,v),_,_) -> Vars.add v a) env bindings
-  in env', nsepseq_foldl (fv_let_rec_fun_binding env') fv bindings
+and fv_let_bindings (env, _ as state) bindings =
+  nsepseq_foldl (fv_let_binding env) state bindings
 
 and fv_let_binding env (env',fv) (pattern,_,expr) =
   Vars.union (pattern_vars Vars.empty pattern) env', fv_expr env fv expr
 
-and fv_let_rec_fun_binding  env fv (_,_,expr) = fv_expr env fv (Fun expr)
+and fv_let_rec_bindings (env, fv) bindings =
+  let env' =
+    nsepseq_foldl (fun a ((_,v),_,_) -> Vars.add v a) env bindings
+  in env', nsepseq_foldl (fv_let_rec_binding env') fv bindings
+
+and fv_let_rec_binding env fv (_,_,expr) = fv_expr env fv (Fun expr)
 
 and pattern_vars fv = function
-  Ptuple (_,patterns)      -> nsepseq_foldl pattern_vars fv patterns
-| Plist (_,(_,patterns,_)) -> sepseq_foldl  pattern_vars fv patterns
-| Pvar (_,var)             -> Vars.add var fv
-| Punit _ | Pwild _        -> fv
-| Pcons (_,(p1,_,p2))      -> pattern_vars (pattern_vars fv p1) p2
-| Ppar (_,(_,pattern,_))   -> pattern_vars fv pattern
+  Ptuple (_,patterns)        -> nsepseq_foldl pattern_vars fv patterns
+| Plist (_,(_,patterns,_))   -> sepseq_foldl  pattern_vars fv patterns
+| Pvar (_,var)               -> Vars.add var fv
+| Punit _ | Pwild _ | Pint _ -> fv
+| Pcons (_,(p1,_,p2))        -> pattern_vars (pattern_vars fv p1) p2
+| Ppar (_,(_,pattern,_))     -> pattern_vars fv pattern
 
 and fv_expr env fv = function
-  LetExpr (_,e) ->
-    fv_let_expr (env, fv) e
-| Fun (_,(_,(_,v),_,e)) ->
-    fv_expr (Vars.add v env) fv e
-| CatExpr e ->
-    fv_cat_expr env fv e
-| Tuple (_,comps) ->
-    nsepseq_foldl (fv_cat_expr env) fv comps
-| If (_,(_,e1,_,e2,_,e3)) ->
-    fv_expr env (fv_expr env (fv_expr env fv e1) e2) e3
+            LetExpr (_,e) -> fv_let_expr (env, fv) e
+|   Fun (_,(_,(_,v),_,e)) -> fv_expr (Vars.add v env) fv e
+|               CatExpr e -> fv_cat_expr env fv e
+|         Tuple (_,comps) -> nsepseq_foldl (fv_cat_expr env) fv comps
+|             Match (_,e) -> fv_match_expr env fv e
+| If (_,(_,e1,_,e2,_,e3)) -> let f = fv_expr env in f (f (f fv e1) e2) e3
+
+and fv_match_expr env fv (_, expr, _, cases,_) =
+  fv_cases env (fv_expr env fv expr) cases
+
+and fv_cases env fv cases = nsepseq_foldl (fv_case env) fv cases
+
+and fv_case env fv (pattern, _, expr) =
+  fv_expr (Vars.union (pattern_vars Vars.empty pattern) env) fv expr
 
 and fv_let_expr state = function
   LetIn (_,bindings,_,expr) ->
-    (curry fv_expr) (fv_let_bindings state bindings) expr
+    (uncurry fv_expr) (fv_let_bindings state bindings) expr
 | LetRecIn (_,_,bindings,_,expr) ->
-    (curry fv_expr) (fv_let_rec_bindings state bindings) expr
+    (uncurry fv_expr) (fv_let_rec_bindings state bindings) expr
 
 and fv_cat_expr env fv = function
   Cat (_,(e1,_,e2)) -> fv_cat_expr env (fv_cons_expr env fv e1) e2

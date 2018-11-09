@@ -3,36 +3,37 @@
 type file = {start_pos: Pos.t; name: string}
 
 type t =
-(* Symbols *)
+  (* Symbols *)
 
   ARROW    (* "->" *)
+| BAR      (* "|"  *)
 | CONS     (* "::" *)
 | CAT      (* "^"  *)
 
-(* Arithmetics *)
+  (* Arithmetics *)
 
 | MINUS    (* "-" *)
 | PLUS     (* "+" *)
 | DIV      (* "/" *)
 | MULT     (* "*" *)
 
-(* Compounds *)
+  (* Compounds *)
 
 | LPAR     (* "(" *)
 | RPAR     (* ")" *)
 | LBRACK   (* "[" *)
 | RBRACK   (* "]" *)
 
-(* Separators *)
+  (* Separators *)
 
 | COMMA    (* "," *)
 | SEMI     (* ";" *)
 
-(* Wildcard *)
+  (* Wildcard *)
 
 | WILD     (* "_" *)
 
-(* Comparisons *)
+  (* Comparisons *)
 
 | EQ       (* "="  *)
 | NE       (* "<>" *)
@@ -44,30 +45,33 @@ type t =
 | BOOL_OR  (* "||" *)
 | BOOL_AND (* "&&" *)
 
-(* Identifiers, labels, numbers and strings *)
+  (* Identifiers, labels, numbers and strings *)
 
 | Ident of string
 | Int   of Z.t
 | Str   of string
 
-(* Keywords *)
+  (* Keywords *)
 
 | And
 | Else
+| End
 | False
 | Fun
 | If
 | In
 | Let
+| Match
 | Mod
 | Not
 | Rec
 | Then
 | True
+| With
 
-(* Virtual tokens *)
+  (* Virtual tokens *)
 
-| EOF                 (* End of file       *)
+| EOF (* End of file *)
 
 type token = t
 

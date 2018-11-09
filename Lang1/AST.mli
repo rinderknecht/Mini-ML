@@ -26,29 +26,32 @@ type 'a reg = Region.t * 'a
 
 type kwd_and   = Region.t
 type kwd_else  = Region.t
+type kwd_end   = Region.t
 type kwd_false = Region.t
 type kwd_fun   = Region.t
 type kwd_if    = Region.t
 type kwd_in    = Region.t
 type kwd_let   = Region.t
+type kwd_match = Region.t
 type kwd_mod   = Region.t
 type kwd_not   = Region.t
 type kwd_rec   = Region.t
 type kwd_then  = Region.t
 type kwd_true  = Region.t
+type kwd_with  = Region.t
 
 (* Symbols *)
 
-type arrow    = Region.t                                              (* "->" *)
-type cons     = Region.t                                              (* "::" *)
-type cat      = Region.t                                              (* "^"  *)
+type arrow = Region.t                                                 (* "->" *)
+type cons  = Region.t                                                 (* "::" *)
+type cat   = Region.t                                                 (* "^"  *)
 
 (* Arithmetic operators *)
 
-type minus  = Region.t                                                 (* "-" *)
-type plus   = Region.t                                                 (* "+" *)
-type div    = Region.t                                                 (* "/" *)
-type mult   = Region.t                                                 (* "*" *)
+type minus = Region.t                                                  (* "-" *)
+type plus  = Region.t                                                  (* "+" *)
+type div   = Region.t                                                  (* "/" *)
+type mult  = Region.t                                                  (* "*" *)
 
 (* Boolean operators *)
 
@@ -75,6 +78,7 @@ type rbra = Region.t                                                   (* "]" *)
 
 type comma = Region.t                                                  (* "," *)
 type semi  = Region.t                                                  (* ";" *)
+type bar   = Region.t                                                  (* "|" *)
 
 (* Wildcard *)
 
@@ -87,6 +91,10 @@ type var = string
 (* Comma-separated non-empty lists *)
 
 type 'a csv = ('a, comma) nsepseq
+
+(* Bar-separated non-empty lists *)
+
+type 'a bsv = ('a, bar) nsepseq
 
 (* Semicolon-separated lists *)
 
@@ -120,15 +128,16 @@ and let_bindings = (let_binding, kwd_and) nsepseq  (* p1 = e1 and p2 = e2 ... *)
 
 and let_binding = pattern * eq * expr                                (* p = e *)
 
-and let_rec_bindings = (let_rec_fun_binding,  kwd_and) nsepseq
+and let_rec_bindings = (let_rec_binding,  kwd_and) nsepseq
 
-and let_rec_fun_binding  = var reg * eq * fun_expr
+and let_rec_binding  = var reg * eq * fun_expr
 
 and pattern =
   Ptuple of pattern csv reg                                  (* p1, p2, ...   *)
 | Plist  of pattern ssv bra reg                              (* [p1; p2; ...] *)
 | Pvar   of var reg                                          (*             x *)
 | Punit  of unit__ reg                                       (*            () *)
+| Pint   of Z.t reg                                          (*             7 *)
 | Pwild  of wild                                             (*             _ *)
 | Pcons  of (pattern * cons * pattern) reg                   (*      p1 :: p2 *)
 | Ppar   of pattern par reg                                  (*           (p) *)
@@ -138,7 +147,12 @@ and expr =
 | Fun     of fun_expr           (* fun x -> e                                 *)
 | If      of conditional reg    (* if e1 then e2 else e3                      *)
 | Tuple   of cat_expr csv reg   (* e1, e2, ...                                *)
+| Match   of match_expr reg     (* p1 -> e1 | p2 -> e2 | ...                  *)
 | CatExpr of cat_expr
+
+and match_expr = kwd_match * expr * kwd_with * cases * kwd_end
+
+and cases = (pattern * arrow * expr) bsv
 
 and let_expr =
   LetIn    of kwd_let           * let_bindings     * kwd_in * expr
@@ -417,4 +431,4 @@ module FreeVars: Set.S with type elt = rvar
    OCaml.
 *)
 
-val vars: t -> Vars.t * FreeVars.t
+val vars : t -> Vars.t * FreeVars.t

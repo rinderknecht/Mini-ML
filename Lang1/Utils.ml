@@ -12,8 +12,8 @@ let swap f x y = f y x
 
 let lambda = fun x _ -> x
 
-let curry f (x,y) = f x y
-let uncurry f x y = f (x,y)
+let curry f x y = f (x,y)
+let uncurry f (x,y) = f x y
 
 (* Parametric rules for sequences *)
 

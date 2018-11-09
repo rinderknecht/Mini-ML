@@ -47,20 +47,24 @@ open AST
 
 %inline kwd_and:   oreg(And)     { $1 }
 %inline kwd_else:  oreg(Else)    { $1 }
+%inline kwd_end:   oreg(End)     { $1 }
 %inline kwd_false: oreg(False)   { $1 }
 %inline kwd_fun:   oreg(Fun)     { $1 }
 %inline kwd_if:    oreg(If)      { $1 }
 %inline kwd_in:    oreg(In)      { $1 }
 %inline kwd_let:   oreg(Let)     { $1 }
+%inline kwd_match: oreg(Match)   { $1 }
 %inline kwd_mod:   oreg(Mod)     { $1 }
 %inline kwd_not:   oreg(Not)     { $1 }
 %inline kwd_rec:   oreg(Rec)     { $1 }
 %inline kwd_then:  oreg(Then)    { $1 }
 %inline kwd_true:  oreg(True)    { $1 }
+%inline kwd_with:  oreg(With)    { $1 }
 
 (* Symbols *)
 
 %inline arrow:    oreg(ARROW)    { $1 }
+%inline bar:      oreg(BAR)      { $1 }
 %inline cons:     oreg(CONS)     { $1 }
 %inline cat:      oreg(CAT)      { $1 }
 %inline minus:    oreg(MINUS)    { $1 }
@@ -141,6 +145,11 @@ sepseq(X,Sep):
 csv(X):
   reg(X comma nsepseq(X,comma) { let hd,tl = $3 in $1, ($2,hd)::tl }) { $1 }
 
+(* Non-empty bar-separated productions *)
+
+bsv(X):
+  nsepseq(X,bar) { $1 }
+
 (* Possibly empty semicolon-separated values between brackets *)
 
 list__(X):
@@ -185,6 +194,7 @@ non_rec_lhs:
 common_pattern:
   wild                                                              {  Pwild $1 }
 | unit                                                              {  Punit $1 }
+| reg(Int)                                                          {   Pint $1 }
 | list__(cons_pat)                                                  {  Plist $1 }
 | par(ptuple)                                                       {   Ppar $1 }
 
@@ -211,9 +221,17 @@ expr:
 | csv(cat_expr)                                                    {   Tuple $1 }
 | reg(conditional)                                                 {      If $1 }
 | fun_expr                                                         {     Fun $1 }
+| reg(match_expr)                                                  {   Match $1 }
+
+match_expr:
+  kwd_match expr kwd_with bsv(case) kwd_end                    { $1,$2,$3,$4,$5 }
+
+case:
+  ident arrow expr                                            { Pvar $1, $2, $3 }
+| non_rec_lhs arrow expr                                             { $1,$2,$3 }
 
 let_expr:
-  kwd_let         let_bindings     kwd_in expr      {    LetIn ($1,$2,$3,$4)    }
+  kwd_let         let_bindings     kwd_in expr      {    LetIn ($1,   $2,$3,$4) }
 | kwd_let kwd_rec let_rec_bindings kwd_in expr      { LetRecIn ($1,$2,$3,$4,$5) }
 
 conditional:

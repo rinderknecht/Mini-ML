@@ -28,12 +28,15 @@ let keywords =
          "if",     Some If;
          "in",     Some In;
          "else",   Some Else;
+         "end",    Some End;
          "let",    Some Let;
+         "match",  Some Match;
          "mod",    Some Mod;
          "not",    Some Not;
          "rec",    Some Rec;
          "then",   Some Then;
          "true",   Some True;
+         "with",   Some With;
 
          (* Reserved *)
 
@@ -46,7 +49,6 @@ let keywords =
          "do",          None;
          "done",        None;
          "downto",      None;
-         "end",         None;
          "exception",   None;
          "external",    None;
          "for",         None;
@@ -61,7 +63,6 @@ let keywords =
          "lsl",         None;
          "lsr",         None;
          "lxor",        None;
-         "match",       None;
          "method",      None;
          "module",      None;
          "mutable",     None;
@@ -80,8 +81,7 @@ let keywords =
          "val",         None;
          "virtual",     None;
          "when",        None;
-         "while",       None;
-         "with",        None
+         "while",       None
         ]
 
 let add map (key,value) = String.Map.add key value map
@@ -144,6 +144,7 @@ rule scan = parse
 | "->" { Token.ARROW    }
 | "::" { Token.CONS     }
 | "^"  { Token.CAT      }
+| "|"  { Token.BAR      }
 
 | "="  { Token.EQ       }
 | "<>" { Token.NE       }

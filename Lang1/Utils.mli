@@ -6,11 +6,11 @@ val id: 'a -> 'a
 
 (* Combinators *)
 
-val ( <@ ):   ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
-val swap:    ('a -> 'b -> 'c) -> 'b -> 'a -> 'c
-val lambda:  'a -> 'b -> 'a
-val curry:   ('a -> 'b -> 'c) -> 'a * 'b -> 'c
-val uncurry: ('a * 'b -> 'c) -> 'a -> 'b -> 'c
+val ( <@ )  : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
+val swap    : ('a -> 'b -> 'c) -> 'b -> 'a -> 'c
+val lambda  : 'a -> 'b -> 'a
+val curry   : ('a * 'b -> 'c) -> 'a -> 'b -> 'c
+val uncurry : ('a -> 'b -> 'c) -> 'a * 'b -> 'c
 
 (* Parametric rules for sequences
 

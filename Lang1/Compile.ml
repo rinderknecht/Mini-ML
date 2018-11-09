@@ -79,8 +79,7 @@ and get_state, get_edit = fst, snd
 (*let mk_pad reg = String.make (Loc.offset (Region.start_loc reg)) ' '*)
 
 let rec edit_ast ~debug (ast,_) =
-  (if Utils.String.Set.is_empty debug
-   ||  Utils.String.Set.mem "compiler" debug
+  (if   Utils.String.Set.is_empty debug
    then Utils.id
    else insert "let () = Printexc.record_backtrace true\n")
 <@ edit_statements ast
@@ -105,11 +104,9 @@ and add_line loc filter =
                (String.make (Loc.offset loc) ' ')
   in discard loc @@ insert text filter
 and edit_binding edit reg filter =
-  if Region.file reg = get_input filter then
-    add_line (Region.start_loc reg)
-  @@ edit
-  @@ discard (Region.stop_loc reg) filter
-  else filter
+   add_line (Region.start_loc reg)
+@@ edit
+@@ discard (Region.stop_loc reg) filter
 
 and edit_let_bindings bindings = edit_and edit_let_binding bindings
 
@@ -135,7 +132,21 @@ and edit_expr expr =
      | Fun (_,(_,_,_,e)) -> edit_expr        e
      |         CatExpr e -> edit_cat_expr    e
      |          If (_,c) -> edit_conditional c
-     |       Tuple (_,t) -> edit_components  t)
+     |       Tuple (_,t) -> edit_components  t
+     |       Match (_,e) -> edit_match       e)
+
+and edit_match (kwd_match, expr, kwd_with, cases, kwd_end) =
+  copy_to (Region.start_loc kwd_match)
+<@ insert "("
+(*<@ copy_to (Region.stop_loc kwd_match)*)
+<@ edit_expr expr
+<@ copy_to (Region.stop_loc kwd_with)
+<@ edit_cases cases
+<@ insert ")"
+
+and edit_cases cases = nsepseq_foldr edit_case cases
+
+and edit_case (_, _, expr) = edit_expr expr
 
 and edit_let_in_bindings (edit, kwd_in, expr) =
    edit
@@ -152,7 +163,7 @@ and edit_let_expr expr =
         edit_let_rec_bindings bindings, kwd_in, expr)
 
 and edit_conditional (_,cond,_,ifso,_,ifnot) =
-  let edit = edit_expr in edit cond <@ edit ifso <@ edit ifnot
+  edit_expr cond <@ edit_expr ifso <@ edit_expr ifnot
 
 and edit_components comp = nsepseq_foldr edit_cat_expr comp
 

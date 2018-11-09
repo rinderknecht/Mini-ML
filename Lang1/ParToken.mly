@@ -14,6 +14,7 @@
 %token RBRACK
 
 %token ARROW
+%token BAR
 %token CONS
 %token CAT
 
@@ -39,16 +40,19 @@
 
 %token And
 %token Else
+%token End
 %token False
 %token Fun
 %token If
 %token In
 %token Let
+%token Match
 %token Mod
 %token Not
 %token Rec
 %token Then
 %token True
+%token With
 
 %token EOF
 

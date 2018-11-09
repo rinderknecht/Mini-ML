@@ -7,7 +7,7 @@ let ghost = Region.ghost
 
 (* Semantic values environment *)
 
-module rec Env: sig
+module rec Env : sig
   type t = Value.t String.Map.t
 
   exception Unbound of rvar
@@ -42,7 +42,7 @@ end
 
 (* Semantic values *)
 
-and Value: sig
+and Value : sig
   type closure = {param: rvar; body: expr; env: Env.t}
 
   type t =
@@ -124,7 +124,7 @@ end
 
 (* State *)
 
-and State: sig
+and State : sig
   type thread = {
     out: out_channel option
   }
@@ -137,6 +137,7 @@ end = State
 exception Type_error        of State.t * string
 exception Nonlinear_pattern of State.t * rvar
 exception Multiple_decl     of State.t * rvar
+exception Incomplete_match  of State.t
 
 (* Errors not caught by OCaml static typing *)
 
@@ -194,7 +195,7 @@ and eval_statement state = function
 
    by raising the exception [Nonlinear_pattern]. By contrast, the
    previous example yields the raising of [Multiple_decl]. In passing,
-   note that OCaml does not distinguishes these two kinds of erroneous
+   note that OCaml does not distinguish those two kinds of erroneous
    patterns.
 *)
 
@@ -222,6 +223,7 @@ and filter state pat_env patterns values =
     | Ppar (_,(_,pattern,_)), _ ->
         apply acc pattern value
     | Punit _, Value.Unit _ -> acc
+    | Pint (_,m), Value.Int (_,n) when Z.equal m n -> acc
     | Ptuple (_,patterns), Value.Tuple (_,values) ->
         filter state pat_env (nsepseq_to_list patterns) values
     | Plist (_,(_,patterns,_)), Value.List (_,values) ->
@@ -329,14 +331,34 @@ and eval_expr state = function
       LetExpr (_,e) -> eval_let_expr state e
 |         CatExpr e -> eval_cat_expr state e
 |  Tuple components -> eval_tuple state components
+|       Match (_,e) -> eval_match state e
 | Fun (r,(_,x,_,e)) ->
     state.State.thread,
     Value.(Clos (r, {param=x; body=e; env=state.State.env}))
-| If (_,(_,cond,_,ifso,_,ifnot)) ->
-    match eval_expr state cond with
-      thread, Value.Bool (_, true) -> eval_expr State.{state with thread} ifso
-    | thread, Value.Bool (_,false) -> eval_expr State.{state with thread} ifnot
+| If (_,(_, cond,_, if_true, _, otherwise)) ->
+    let thread, value = eval_expr state cond in
+    let eval = eval_expr State.{state with thread} in
+    match value with
+      Value.Bool (_, true)  -> eval if_true
+    | Value.Bool (_, false) -> eval otherwise
     | _ -> raise (Type_error (state, __LOC__))
+
+and eval_match state (_, expr, _, cases, _) =
+  let env = state.State.env in
+  let thread, value = eval_expr state expr in
+  let state = State.{thread; env = Env.empty}
+  in eval_cases env state value cases
+
+and eval_cases env state value (case, cases) =
+  let pattern, _, expr = case in
+  try
+    let state = fst (filter state Env.empty [pattern] [value]) in
+    let env = Env.union (fun _ v -> Some v) env state.env
+    in eval_expr State.{state with env} expr
+  with Type_error _ ->
+    match cases with
+              [] -> raise (Incomplete_match state)
+    | (_,hd)::tl -> eval_cases env state value (hd,tl)
 
 and eval_tuple state (region,exprs) =
   let apply expr (thread,values) =

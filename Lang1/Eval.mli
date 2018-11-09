@@ -159,6 +159,10 @@ exception Nonlinear_pattern of State.t * rvar
 
 exception Multiple_decl of State.t * rvar
 
+(**)
+
+exception Incomplete_match  of State.t
+
 (* Division by zero *)
 
 exception Div_by_zero of State.t * Region.t
