@@ -181,18 +181,18 @@ let_bindings:
 let_binding:
   ident nseq(pattern) eq expr                  { let expr = Fun (norm $2 $3 $4)
                                                  in Pvar $1, Region.ghost, expr }
-| ident               eq expr                  {                Pvar $1, $2, $3 }
-| non_rec_lhs         eq expr                  {                     $1, $2, $3 }
+| let_lhs             eq expr                  {                     $1, $2, $3 }
 
 (* Patterns *)
 
-non_rec_lhs:
-  common_pattern                                                    {        $1 }
-| reg(pattern cons cons_pat {$1,$2,$3})                             {  Pcons $1 }
+let_lhs:
+  reg(pattern cons cons_pat {$1,$2,$3})                             {  Pcons $1 }
 | csv(pattern)                                                      { Ptuple $1 }
+| common_pattern                                                    {        $1 }
 
 common_pattern:
-  wild                                                              {  Pwild $1 }
+  ident                                                             {   Pvar $1 }
+| wild                                                              {  Pwild $1 }
 | unit                                                              {  Punit $1 }
 | reg(Int)                                                          {   Pint $1 }
 | list__(cons_pat)                                                  {  Plist $1 }
@@ -209,9 +209,8 @@ cons_pat:
 | pattern                                                            {       $1 }
 
 pattern:
-  common_pattern                                                      {      $1 }
-| ident                                                               { Pvar $1 }
-| par(cons_pat)                                                       { Ppar $1 }
+  par(cons_pat)                                                       { Ppar $1 }
+| common_pattern                                                      {      $1 }
 
 (* Expressions *)
 
@@ -227,8 +226,7 @@ match_expr:
   kwd_match expr kwd_with bsv(case) kwd_end                    { $1,$2,$3,$4,$5 }
 
 case:
-  ident arrow expr                                            { Pvar $1, $2, $3 }
-| non_rec_lhs arrow expr                                             { $1,$2,$3 }
+  let_lhs arrow expr                                                 { $1,$2,$3 }
 
 let_expr:
   kwd_let         let_bindings     kwd_in expr      {    LetIn ($1,   $2,$3,$4) }
