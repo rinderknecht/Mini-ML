@@ -115,7 +115,8 @@ bracket(X): lbrack X rbrack { $1,$2,$3 }
    sequences of items separated by some token (e.g., a comma), and
    rule [nsepseq] is for non-empty such sequences. See module [Utils]
    for the types corresponding to the semantic actions of those
-   rules.  *)
+   rules.
+*)
 
 (* Non-empty sequence of items *)
 

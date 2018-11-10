@@ -40,23 +40,24 @@ let_rec_binding ::=
 let_bindings ::= {let_binding "and" ...}+
 
 let_binding ::=
-  Ident pattern* "=" expr
-| non_rec_lhs "=" expr
+  Ident pattern+ "=" expr
+| let_lhs "=" expr
 
 (* Patterns *)
 
-non_rec_lhs ::=
-  common_pattern
-| pattern cons cons_pat
+let_lhs ::=
+  pattern cons cons_pat
 | {pattern "," ...}+
+| common_pattern
 
 common_pattern ::=
-  "_"
+  Ident
+| "_"
 | "()"
 | "[" {cons_pat ";" ...}* "]"
 | "(" ptuple ")"
 
-ptuple ::= {cons_pat ";" ...}+
+ptuple ::= {cons_pat "," ...}+
 
 unit ::= "(" ")"
 
@@ -65,9 +66,8 @@ cons_pat ::=
 | pattern
 
 pattern ::=
-  common_pattern
-| Ident
-| "(" cons_pat ")"
+  "(" cons_pat ")"
+| common_pattern
 
 (* Expressions *)
 
