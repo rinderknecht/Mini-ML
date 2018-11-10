@@ -1,5 +1,8 @@
 (* Extended Backus-Naur Form (EBNF) for Mini-ML
 
+   This is not a strict subset of OCaml because the "match" construct
+   is closed here with the keyword "end".
+
    Terminal are either excerpts of concrete syntax between double
    quotes, e.g. ";", or start with a capital letter.
 
@@ -74,6 +77,14 @@ expr ::=
 | {cat_expr "," ...}+
 | conditional
 | fun_expr
+| match_expr
+
+match_expr ::=
+  "match" expr "with" {case "|" ...}+ "end"
+
+case ::=
+  ident "->" expr
+| non_rec_lhs "->" expr
 
 let_expr ::=
   "let" let_bindings "in" expr
