@@ -161,7 +161,7 @@ exception Multiple_decl of State.t * rvar
 
 (**)
 
-exception Incomplete_match  of State.t
+exception Incomplete_match of State.t
 
 (* Division by zero *)
 

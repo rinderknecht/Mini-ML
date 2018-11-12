@@ -224,6 +224,9 @@ and filter state pat_env patterns values =
         apply acc pattern value
     | Punit _, Value.Unit _ -> acc
     | Pint (_,m), Value.Int (_,n) when Z.equal m n -> acc
+    | Ptrue _, Value.Bool (_, true) -> acc
+    | Pfalse _, Value.Bool (_, false) -> acc
+    | Pstr (_,s1), Value.Str (_,s2) when s1 = s2 -> acc
     | Ptuple (_,patterns), Value.Tuple (_,values) ->
         filter state pat_env (nsepseq_to_list patterns) values
     | Plist (_,(_,patterns,_)), Value.List (_,values) ->
@@ -353,7 +356,7 @@ and eval_cases env state value (case, cases) =
   let pattern, _, expr = case in
   try
     let state = fst (filter state Env.empty [pattern] [value]) in
-    let env = Env.union (fun _ v -> Some v) env state.env
+    let env = Env.union (fun _ v -> Some v) env state.State.env
     in eval_expr State.{state with env} expr
   with Type_error _ ->
     match cases with

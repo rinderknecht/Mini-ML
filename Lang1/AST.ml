@@ -119,6 +119,9 @@ and pattern =
 | Pvar   of var reg
 | Punit  of unit__ reg
 | Pint   of Z.t reg
+| Ptrue  of kwd_true
+| Pfalse of kwd_false
+| Pstr   of string reg
 | Pwild  of wild
 | Pcons  of (pattern * cons * pattern) reg
 | Ppar   of pattern par reg
@@ -316,6 +319,9 @@ and pattern_to_string = function
 | Ppar (_,(_,p,_))    -> Printf.sprintf "(%s)" (pattern_to_string p)
 | Punit _             -> "()"
 | Pint (_,z)          -> Z.to_string z
+| Ptrue _             -> "true"
+| Pfalse _            -> "false"
+| Pstr (_,s)          -> Printf.sprintf "\"%s\"" s
 | Pwild _             -> "_"
 | Pcons (_,(p1,_,p2)) -> Printf.sprintf "(%s::%s)"
                           (pattern_to_string p1) (pattern_to_string p2)
@@ -423,8 +429,9 @@ and scanf_to_string = function
 (* Projecting regions of the input source code *)
 
 let rec region_of_pattern = function
-  Plist (r,_) | Ptuple (r,_) | Pvar (r,_) | Punit (r,_)
-| Pint (r,_) | Pwild r | Pcons (r,_) | Ppar (r,_) -> r
+  Plist (r,_) | Ptuple (r,_) | Pvar (r,_)
+| Punit (r,_) | Pint (r,_) | Ptrue r | Pfalse r
+| Pstr (r,_) | Pwild r | Pcons (r,_) | Ppar (r,_) -> r
 
 and region_of_unary_expr = function
   Neg (r,_) | Not (r,_) -> r
@@ -703,6 +710,9 @@ and print_pattern = function
     print_token lpar "("; print_token rpar ")"
 | Pint (reg,z) ->
     print_token reg (Printf.sprintf "(Int %s)" (Z.to_string z))
+| Ptrue kwd_true -> print_token kwd_true "true"
+| Pfalse kwd_false -> print_token kwd_false "false"
+| Pstr s -> print_str s
 | Pwild wild ->
     print_token wild "_"
 | Pcons (_,(p1,c,p2)) ->
@@ -875,12 +885,13 @@ and fv_let_rec_bindings (env, fv) bindings =
 and fv_let_rec_binding env fv (_,_,expr) = fv_expr env fv (Fun expr)
 
 and pattern_vars fv = function
-  Ptuple (_,patterns)        -> nsepseq_foldl pattern_vars fv patterns
-| Plist (_,(_,patterns,_))   -> sepseq_foldl  pattern_vars fv patterns
-| Pvar (_,var)               -> Vars.add var fv
-| Punit _ | Pwild _ | Pint _ -> fv
-| Pcons (_,(p1,_,p2))        -> pattern_vars (pattern_vars fv p1) p2
-| Ppar (_,(_,pattern,_))     -> pattern_vars fv pattern
+  Ptuple (_,patterns)         -> nsepseq_foldl pattern_vars fv patterns
+| Plist (_,(_,patterns,_))    -> sepseq_foldl  pattern_vars fv patterns
+| Pvar (_,var)                -> Vars.add var fv
+| Pcons (_,(p1,_,p2))         -> pattern_vars (pattern_vars fv p1) p2
+| Ppar (_,(_,pattern,_))      -> pattern_vars fv pattern
+| Punit _ | Pwild _ | Pint _
+| Ptrue _ | Pfalse _ | Pstr _ -> fv
 
 and fv_expr env fv = function
             LetExpr (_,e) -> fv_let_expr (env, fv) e

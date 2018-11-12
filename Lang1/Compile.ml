@@ -135,10 +135,9 @@ and edit_expr expr =
      |       Tuple (_,t) -> edit_components  t
      |       Match (_,e) -> edit_match       e)
 
-and edit_match (kwd_match, expr, kwd_with, cases, kwd_end) =
+and edit_match (kwd_match, expr, kwd_with, cases, _kwd_end) =
   copy_to (Region.start_loc kwd_match)
 <@ insert "("
-(*<@ copy_to (Region.stop_loc kwd_match)*)
 <@ edit_expr expr
 <@ copy_to (Region.stop_loc kwd_with)
 <@ edit_cases cases

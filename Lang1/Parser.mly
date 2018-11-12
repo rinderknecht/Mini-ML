@@ -182,7 +182,7 @@ let_bindings:
 let_binding:
   ident nseq(pattern) eq expr                  { let expr = Fun (norm $2 $3 $4)
                                                  in Pvar $1, Region.ghost, expr }
-| let_lhs             eq expr                  {                     $1, $2, $3 }
+| let_lhs             eq expr                  {                       $1,$2,$3 }
 
 (* Patterns *)
 
@@ -196,6 +196,9 @@ common_pattern:
 | wild                                                              {  Pwild $1 }
 | unit                                                              {  Punit $1 }
 | reg(Int)                                                          {   Pint $1 }
+| kwd_true                                                          {  Ptrue $1 }
+| kwd_false                                                         { Pfalse $1 }
+| string                                                            {   Pstr $1 }
 | list__(cons_pat)                                                  {  Plist $1 }
 | par(ptuple)                                                       {   Ppar $1 }
 
