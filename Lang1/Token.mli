@@ -1,7 +1,5 @@
 (* Lexical tokens for Mini-ML *)
 
-type file = {start_pos: Pos.t; name: string}
-
 type t =
   (* Symbols *)
 
