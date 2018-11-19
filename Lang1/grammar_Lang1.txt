@@ -19,12 +19,11 @@
    non_terminal*                : A possibly empty sequence of non-terminals
 *)
 
-program ::= statements EOF
+program ::= statement* EOF
 
-statements ::=
-  "let" let_bindings statements
-| "let" "rec" let_bindings statements
-| /* empty */
+statement ::=
+  "let"       let_bindings
+| "let" "rec" let_rec_bindings
 
 (* Recursive definitions *)
 
@@ -32,8 +31,7 @@ let_rec_bindings ::= {let_rec_binding "and" ...}+
 
 let_rec_binding ::=
   Ident pattern+ "=" expr
-| Ident "=" expr
-| non_rec_lhs "=" expr
+| Ident          "=" fun_expr
 
 (* Non-recursive definitions *)
 
@@ -41,7 +39,7 @@ let_bindings ::= {let_binding "and" ...}+
 
 let_binding ::=
   Ident pattern+ "=" expr
-| let_lhs "=" expr
+| let_lhs        "=" expr
 
 (* Patterns *)
 
@@ -54,6 +52,7 @@ common_pattern ::=
   Ident
 | "_"
 | "()"
+| Int
 | "true"
 | "false"
 | String
@@ -86,11 +85,10 @@ match_expr ::=
   "match" expr "with" {case "|" ...}+ "end"
 
 case ::=
-  ident "->" expr
-| non_rec_lhs "->" expr
+  let_lhs "->" expr
 
 let_expr ::=
-  "let" let_bindings "in" expr
+  "let"       let_bindings     "in" expr
 | "let" "rec" let_rec_bindings "in" expr
 
 conditional ::= "if" expr "then" expr "else" expr
