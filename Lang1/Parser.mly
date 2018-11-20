@@ -45,62 +45,26 @@ open AST
 
 (* Keywords in common with OCaml *)
 
-%inline kwd_and:   oreg(And)     { $1 }
-%inline kwd_else:  oreg(Else)    { $1 }
-%inline kwd_end:   oreg(End)     { $1 }
-%inline kwd_false: oreg(False)   { $1 }
-%inline kwd_fun:   oreg(Fun)     { $1 }
-%inline kwd_if:    oreg(If)      { $1 }
-%inline kwd_in:    oreg(In)      { $1 }
-%inline kwd_let:   oreg(Let)     { $1 }
-%inline kwd_match: oreg(Match)   { $1 }
-%inline kwd_mod:   oreg(Mod)     { $1 }
-%inline kwd_not:   oreg(Not)     { $1 }
-%inline kwd_rec:   oreg(Rec)     { $1 }
-%inline kwd_then:  oreg(Then)    { $1 }
-%inline kwd_true:  oreg(True)    { $1 }
-%inline kwd_with:  oreg(With)    { $1 }
+let kwd(X) == ~=oreg(X); <>
 
 (* Symbols *)
 
-%inline arrow:    oreg(ARROW)    { $1 }
-%inline bar:      oreg(BAR)      { $1 }
-%inline cons:     oreg(CONS)     { $1 }
-%inline cat:      oreg(CAT)      { $1 }
-%inline minus:    oreg(MINUS)    { $1 }
-%inline plus:     oreg(PLUS)     { $1 }
-%inline div:      oreg(DIV)      { $1 }
-%inline mult:     oreg(MULT)     { $1 }
-%inline lpar:     oreg(LPAR)     { $1 }
-%inline rpar:     oreg(RPAR)     { $1 }
-%inline lbrack:   oreg(LBRACK)   { $1 }
-%inline rbrack:   oreg(RBRACK)   { $1 }
-%inline comma:    oreg(COMMA)    { $1 }
-%inline semi:     oreg(SEMI)     { $1 }
-%inline wild:     oreg(WILD)     { $1 }
-%inline eq:       oreg(EQ)       { $1 }
-%inline ne:       oreg(NE)       { $1 }
-%inline lt:       oreg(LT)       { $1 }
-%inline gt:       oreg(GT)       { $1 }
-%inline le:       oreg(LE)       { $1 }
-%inline ge:       oreg(GE)       { $1 }
-%inline bool_or:  oreg(BOOL_OR)  { $1 }
-%inline bool_and: oreg(BOOL_AND) { $1 }
+let sym(X) == ~=oreg(X); <>
 
 (* Literals *)
 
-%inline ident:    reg(Ident)     { $1 }
-%inline string:   reg(Str)       { $1 }
+let ident  == ~=reg(Ident); <>
+let string == ~=reg(Str);   <>
 
 (* Virtual tokens *)
 
-%inline eof:      oreg(EOF)      { $1 }
+let eof == ~=oreg(EOF); <>
 
 (* Compounds *)
 
-par(X): reg(lpar X rpar {$1,$2,$3}) { $1 }
+par(X): reg(sym(LPAR) X sym(RPAR) { $1,$2,$3 }) { $1 }
 
-bracket(X): lbrack X rbrack { $1,$2,$3 }
+bracket(X): sym(LBRACK) X sym(RBRACK) { $1,$2,$3 }
 
 (* Sequences
 
@@ -144,17 +108,17 @@ sepseq(X,Sep):
 (* Non-empty comma-separated values *)
 
 csv(X):
-  reg(X comma nsepseq(X,comma) { let hd,tl = $3 in $1, ($2,hd)::tl }) { $1 }
+  reg(X sym(COMMA) nsepseq(X,sym(COMMA)) { let h,t = $3 in $1,($2,h)::t }) { $1 }
 
 (* Non-empty bar-separated productions *)
 
 bsv(X):
-  nsepseq(X,bar) { $1 }
+  nsepseq(X,sym(BAR)) { $1 }
 
 (* Possibly empty semicolon-separated values between brackets *)
 
 list__(X):
-  reg(bracket(sepseq(X,semi))) { $1 }
+  reg(bracket(sepseq(X,sym(SEMI)))) { $1 }
 
 (* Main *)
 
@@ -162,42 +126,42 @@ program:
   seq(statement) eof                                                    { $1,$2 }
 
 statement:
-  reg(kwd_let         let_bindings     {$1,$2})                     {    Let $1 }
-| reg(kwd_let kwd_rec let_rec_bindings {$1,$2,$3})                  { LetRec $1 }
+  reg(kwd(Let)          let_bindings     {$1,$2})                   {    Let $1 }
+| reg(kwd(Let) kwd(Rec) let_rec_bindings {$1,$2,$3})                { LetRec $1 }
 
 (* Recursive definitions *)
 
 let_rec_bindings:
-  nsepseq(let_rec_binding, kwd_and)                                        { $1 }
+  nsepseq(let_rec_binding, kwd(And))                                       { $1 }
 
 let_rec_binding:
-  ident nseq(pattern) eq expr                 { $1, Region.ghost, norm $2 $3 $4 }
-| ident               eq fun_expr             { $1,           $2,            $3 }
+  ident nseq(pattern) sym(EQ) expr            { $1, Region.ghost, norm $2 $3 $4 }
+| ident               sym(EQ) fun_expr        { $1,           $2,            $3 }
 
 (* Non-recursive definitions *)
 
 let_bindings:
-  nsepseq(let_binding, kwd_and)                                            { $1 }
+  nsepseq(let_binding, kwd(And))                                           { $1 }
 
 let_binding:
-  ident nseq(pattern) eq expr                  { let expr = Fun (norm $2 $3 $4)
+  ident nseq(pattern) sym(EQ) expr             { let expr = Fun (norm $2 $3 $4)
                                                  in Pvar $1, Region.ghost, expr }
-| let_lhs             eq expr                  {                       $1,$2,$3 }
+| let_lhs             sym(EQ) expr             {                       $1,$2,$3 }
 
 (* Patterns *)
 
 let_lhs:
-  reg(pattern cons cons_pat {$1,$2,$3})                             {  Pcons $1 }
+  reg(pattern sym(CONS) cons_pat {$1,$2,$3})                        {  Pcons $1 }
 | csv(pattern)                                                      { Ptuple $1 }
 | common_pattern                                                    {        $1 }
 
 common_pattern:
   ident                                                             {   Pvar $1 }
-| wild                                                              {  Pwild $1 }
+| sym(WILD)                                                         {  Pwild $1 }
 | unit                                                              {  Punit $1 }
 | reg(Int)                                                          {   Pint $1 }
-| kwd_true                                                          {  Ptrue $1 }
-| kwd_false                                                         { Pfalse $1 }
+| kwd(True)                                                         {  Ptrue $1 }
+| kwd(False)                                                        { Pfalse $1 }
 | string                                                            {   Pstr $1 }
 | list__(cons_pat)                                                  {  Plist $1 }
 | par(ptuple)                                                       {   Ppar $1 }
@@ -206,10 +170,10 @@ ptuple:
   csv(cons_pat)                                                     { Ptuple $1 }
 
 unit:
-  reg(lpar rpar {$1,$2})                                                   { $1 }
+  reg(sym(LPAR) sym(RPAR) {$1,$2})                                         { $1 }
 
 cons_pat:
-  reg(pattern cons cons_pat {$1,$2,$3})                              { Pcons $1 }
+  reg(pattern sym(CONS) cons_pat {$1,$2,$3})                         { Pcons $1 }
 | pattern                                                            {       $1 }
 
 pattern:
@@ -227,63 +191,63 @@ expr:
 | reg(match_expr)                                                  {   Match $1 }
 
 match_expr:
-  kwd_match expr kwd_with bsv(case) kwd_end                    { $1,$2,$3,$4,$5 }
+  kwd(Match) expr kwd(With) bsv(case) kwd(End)                 { $1,$2,$3,$4,$5 }
 
 case:
-  let_lhs arrow expr                                                 { $1,$2,$3 }
+  let_lhs sym(ARROW) expr                                            { $1,$2,$3 }
 
 let_expr:
-  kwd_let         let_bindings     kwd_in expr      {    LetIn ($1,   $2,$3,$4) }
-| kwd_let kwd_rec let_rec_bindings kwd_in expr      { LetRecIn ($1,$2,$3,$4,$5) }
+  kwd(Let)          let_bindings     kwd(In) expr   {    LetIn ($1,   $2,$3,$4) }
+| kwd(Let) kwd(Rec) let_rec_bindings kwd(In) expr   { LetRecIn ($1,$2,$3,$4,$5) }
 
 conditional:
-  kwd_if expr kwd_then expr kwd_else expr                   { $1,$2,$3,$4,$5,$6 }
+  kwd(If) expr kwd(Then) expr kwd(Else) expr                { $1,$2,$3,$4,$5,$6 }
 
 fun_expr:
-  reg(kwd_fun nseq(pattern) arrow expr {$1,$2,$3,$4}) {
+  reg(kwd(Fun) nseq(pattern) sym(ARROW) expr {$1,$2,$3,$4}) {
     let reg, (kwd_fun, patterns, arrow, expr) = $1
     in norm ~reg:(reg, kwd_fun) patterns arrow expr
   }
 
 cat_expr:
-  reg(cons_expr cat cat_expr {$1,$2,$3})                         {       Cat $1 }
+  reg(cons_expr sym(CAT) cat_expr {$1,$2,$3})                    {       Cat $1 }
 | cons_expr                                                      {  ConsExpr $1 }
 
 cons_expr:
-  reg(disj_expr cons cons_expr {$1,$2,$3})                       {      Cons $1 }
+  reg(disj_expr sym(CONS) cons_expr {$1,$2,$3})                  {      Cons $1 }
 | disj_expr                                                      {  DisjExpr $1 }
 
 disj_expr:
-  reg(disj_expr bool_or conj_expr {$1,$2,$3})                    {        Or $1 }
+  reg(disj_expr sym(BOOL_OR) conj_expr {$1,$2,$3})               {        Or $1 }
 | conj_expr                                                      {  ConjExpr $1 }
 
 conj_expr:
-  reg(conj_expr bool_and comp_expr {$1,$2,$3})                   {       And $1 }
+  reg(conj_expr sym(BOOL_AND) comp_expr {$1,$2,$3})              {       And $1 }
 | comp_expr                                                      {  CompExpr $1 }
 
 comp_expr:
-  reg(comp_expr lt add_expr {$1,$2,$3})                          {        Lt $1 }
-| reg(comp_expr le add_expr {$1,$2,$3})                          {       LEq $1 }
-| reg(comp_expr gt add_expr {$1,$2,$3})                          {        Gt $1 }
-| reg(comp_expr ge add_expr {$1,$2,$3})                          {       GEq $1 }
-| reg(comp_expr eq add_expr {$1,$2,$3})                          {        Eq $1 }
-| reg(comp_expr ne add_expr {$1,$2,$3})                          {       NEq $1 }
+  reg(comp_expr sym(LT) add_expr {$1,$2,$3})                     {        Lt $1 }
+| reg(comp_expr sym(LE) add_expr {$1,$2,$3})                     {       LEq $1 }
+| reg(comp_expr sym(GT) add_expr {$1,$2,$3})                     {        Gt $1 }
+| reg(comp_expr sym(GE) add_expr {$1,$2,$3})                     {       GEq $1 }
+| reg(comp_expr sym(EQ) add_expr {$1,$2,$3})                     {        Eq $1 }
+| reg(comp_expr sym(NE) add_expr {$1,$2,$3})                     {       NEq $1 }
 | add_expr                                                       {   AddExpr $1 }
 
 add_expr:
-  reg(add_expr plus   mult_expr {$1,$2,$3})                      {       Add $1 }
-| reg(add_expr minus  mult_expr {$1,$2,$3})                      {       Sub $1 }
+  reg(add_expr sym(PLUS)   mult_expr {$1,$2,$3})                 {       Add $1 }
+| reg(add_expr sym(MINUS)  mult_expr {$1,$2,$3})                 {       Sub $1 }
 | mult_expr                                                      {  MultExpr $1 }
 
 mult_expr:
-  reg(mult_expr mult    unary_expr {$1,$2,$3})                   {      Mult $1 }
-| reg(mult_expr div     unary_expr {$1,$2,$3})                   {       Div $1 }
-| reg(mult_expr kwd_mod unary_expr {$1,$2,$3})                   {       Mod $1 }
+  reg(mult_expr sym(MULT) unary_expr {$1,$2,$3})                 {      Mult $1 }
+| reg(mult_expr sym(DIV)  unary_expr {$1,$2,$3})                 {       Div $1 }
+| reg(mult_expr kwd(Mod)  unary_expr {$1,$2,$3})                 {       Mod $1 }
 | unary_expr                                                     { UnaryExpr $1 }
 
 unary_expr:
-  reg(minus   core_expr {$1,$2})                                 {       Neg $1 }
-| reg(kwd_not core_expr {$1,$2})                                 {       Not $1 }
+  reg(sym(MINUS) core_expr {$1,$2})                              {       Neg $1 }
+| reg(kwd(Not)   core_expr {$1,$2})                              {       Not $1 }
 | primary_expr                                                   {   Primary $1 }
 
 primary_expr:
@@ -295,7 +259,7 @@ core_expr:
 | ident                                                          {       Var $1 }
 | string                                                         {       Str $1 }
 | unit                                                           {      Unit $1 }
-| kwd_false                                                      {     False $1 }
-| kwd_true                                                       {      True $1 }
+| kwd(False)                                                     {     False $1 }
+| kwd(True)                                                      {      True $1 }
 | list__(expr)                                                   {      List $1 }
 | par(expr)                                                      {       Par $1 }

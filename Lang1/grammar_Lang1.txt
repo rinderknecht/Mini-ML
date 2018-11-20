@@ -75,11 +75,10 @@ pattern ::=
 
 expr ::=
   let_expr
-| cat_expr
-| {cat_expr "," ...}+
 | conditional
 | fun_expr
 | match_expr
+| {cat_expr "," ...}+
 
 match_expr ::=
   "match" expr "with" {case "|" ...}+ "end"
