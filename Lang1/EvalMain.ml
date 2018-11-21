@@ -114,10 +114,7 @@ let () =
           let edit =
              TEdit.compile
           @@ get_edit
-(*          @@ add_functor
-          @@ (if EvalOpt.no_stdlib then id else add_prologue)*)
           @@ edit_ast ~debug:EvalOpt.debug ast
-(*          @@ add_end*)
             (state, TEdit.stop) in
 
           (* I/O maps *)
@@ -142,11 +139,8 @@ let () =
               let edit_rte =
                 (if EvalOpt.tco then Edit.compile_cps else Edit.compile)
               @@ get_edit
-              @@ add_prologue
               @@ add_out_channels
               @@ add_error_printing
-              @@ add_try_dot
-              @@ add_functor_call ~bv ~pretty ~labels
               @@ add_error_handling
                 (state, Edit.stop)
               in [edit; edit_rte]

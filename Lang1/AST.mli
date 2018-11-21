@@ -149,9 +149,43 @@ and expr =
   LetExpr of let_expr reg       (* let [rec] p1 = e1 and p2 = e2 and ... in e *)
 | Fun     of fun_expr           (* fun x -> e                                 *)
 | If      of conditional reg    (* if e1 then e2 else e3                      *)
-| Tuple   of cat_expr csv reg   (* e1, e2, ...                                *)
+| Tuple   of expr csv reg       (* e1, e2, ...                                *)
 | Match   of match_expr reg     (* p1 -> e1 | p2 -> e2 | ...                  *)
-| CatExpr of cat_expr
+
+| Cat     of (expr * cat * expr) reg                              (* e1  ^ e2 *)
+| Cons    of (expr * cons * expr) reg                             (* e1 :: e2 *)
+
+| Or      of (expr * bool_or * expr) reg                          (* e1 || e2 *)
+| And     of (expr * bool_and * expr) reg                         (* e1 && e2 *)
+
+| Lt      of (expr * lt * expr) reg                               (* e1  < e2 *)
+| LEq     of (expr * le * expr) reg                               (* e1 <= e2 *)
+| Gt      of (expr * gt * expr) reg                               (* e1  > e2 *)
+| GEq     of (expr * ge * expr) reg                               (* e1 >= e2 *)
+| NEq     of (expr * ne * expr) reg                               (* e1 <> e2 *)
+| Eq      of (expr * eq * expr) reg                               (* e1  = e2 *)
+
+| Add     of (expr * plus   * expr) reg                           (* e1  + e2 *)
+| Sub     of (expr * minus  * expr) reg                           (* e1  - e2 *)
+
+| Mult    of (expr * mult    * expr) reg                         (* e1  *  e2 *)
+| Div     of (expr * div     * expr) reg                         (* e1  /  e2 *)
+| Mod     of (expr * kwd_mod * expr) reg                         (* e1 mod e2 *)
+
+| Neg     of (minus   * expr) reg                                    (*    -e *)
+| Not     of (kwd_not * expr) reg                                    (* not e *)
+
+| Call    of (expr * expr) reg                                         (* f e *)
+
+| Int     of Z.t reg                                         (* 12345         *)
+| Var     of var reg                                         (* x             *)
+| Str     of string reg                                      (* "foo"         *)
+| Unit    of unit__ reg                                      (* ()            *)
+| True    of kwd_true                                        (* true          *)
+| False   of kwd_false                                       (* false         *)
+| Par     of expr par reg                                    (* (e)           *)
+| List    of expr ssv bra reg                                (* [e1; e2; ...] *)
+| Extern  of extern
 
 and match_expr = kwd_match * expr * kwd_with * cases * kwd_end
 
@@ -164,64 +198,6 @@ and let_expr =
 and fun_expr = (kwd_fun * var reg * arrow * expr) reg
 
 and conditional = kwd_if * expr * kwd_then * expr * kwd_else * expr
-
-and cat_expr =
-  Cat      of (cons_expr * cat * cat_expr) reg                     (* e1 ^ e2 *)
-| ConsExpr of cons_expr
-
-and cons_expr =
-  Cons     of (disj_expr * cons * cons_expr) reg                  (* e1 :: e2 *)
-| DisjExpr of disj_expr
-
-and disj_expr =
-  Or       of (disj_expr * bool_or * conj_expr) reg               (* e1 || e2 *)
-| ConjExpr of conj_expr
-
-and conj_expr =
-  And      of (conj_expr * bool_and * comp_expr) reg              (* e1 && e2 *)
-| CompExpr of comp_expr
-
-(* Comparisons *)
-
-and comp_expr =
-  Lt      of (comp_expr * lt * add_expr) reg                      (* e1  < e2 *)
-| LEq     of (comp_expr * le * add_expr) reg                      (* e1 <= e2 *)
-| Gt      of (comp_expr * gt * add_expr) reg                      (* e1  > e2 *)
-| GEq     of (comp_expr * ge * add_expr) reg                      (* e1 >= e2 *)
-| NEq     of (comp_expr * ne * add_expr) reg                      (* e1 <> e2 *)
-| Eq      of (comp_expr * eq * add_expr) reg                      (* e1  = e2 *)
-| AddExpr of add_expr
-
-and add_expr =
-  Add      of (add_expr * plus   * mult_expr) reg                  (* e1 + e2 *)
-| Sub      of (add_expr * minus  * mult_expr) reg                  (* e1 - e2 *)
-| MultExpr of mult_expr
-
-and mult_expr =
-  Mult      of (mult_expr * mult    * unary_expr) reg            (* e1  *  e2 *)
-| Div       of (mult_expr * div     * unary_expr) reg            (* e1  /  e2 *)
-| Mod       of (mult_expr * kwd_mod * unary_expr) reg            (* e1 mod e2 *)
-| UnaryExpr of unary_expr
-
-and unary_expr =
-  Neg     of (minus   * core_expr) reg                               (*    -e *)
-| Not     of (kwd_not * core_expr) reg                               (* not e *)
-| Primary of primary_expr
-
-and primary_expr =
-  CallExpr of (primary_expr * core_expr) reg                           (* f e *)
-| CoreExpr of core_expr
-
-and core_expr =
-  Int    of Z.t reg                                          (* 12345         *)
-| Var    of var reg                                          (* x             *)
-| Str    of string reg                                       (* "foo"         *)
-| Unit   of unit__ reg                                       (* ()            *)
-| True   of kwd_true                                         (* true          *)
-| False  of kwd_false                                        (* false         *)
-| Par    of expr par reg                                     (* (e)           *)
-| List   of expr ssv bra reg                                 (* [e1; e2; ...] *)
-| Extern of extern
 
 and extern =
   Cast     of cast_expr
@@ -357,21 +333,6 @@ type unparsed = [
 
 val unparse: expr -> unparsed
 
-(* Promotion of variables and expressions *)
-
-val var_to_unary_expr: var reg -> unary_expr
-val var_to_mult_expr:  var reg -> mult_expr
-val var_to_add_expr:   var reg -> add_expr
-val var_to_comp_expr:  var reg -> comp_expr
-val var_to_conj_expr:  var reg -> conj_expr
-val var_to_disj_expr:  var reg -> disj_expr
-val var_to_cons_expr:  var reg -> cons_expr
-val var_to_cat_expr:   var reg -> cat_expr
-val var_to_expr:       var reg -> expr
-
-val core_to_expr:      core_expr    -> expr
-val primary_to_expr:   primary_expr -> expr
-
 (* Conversions to type [string] *)
 
 val to_string:         t -> string
@@ -384,23 +345,13 @@ val pattern_to_string: pattern -> string
    the AST to be unparsed before printing (those nodes that have been
    normalised with function [norm_let] and [norm_fun]). *)
 
-val print_tokens: ?undo:bool -> ast -> unit
+val print_tokens : ?undo:bool -> ast -> unit
 
 (* Projecting regions from sundry nodes of the AST. See the first
    comment at the beginning of this file. *)
 
-val region_of_pattern:           pattern -> Region.t
-val region_of_expr:                 expr -> Region.t
-val region_of_primary_expr: primary_expr -> Region.t
-val region_of_core_expr:       core_expr -> Region.t
-val region_of_unary_expr:     unary_expr -> Region.t
-val region_of_mult_expr:       mult_expr -> Region.t
-val region_of_add_expr:         add_expr -> Region.t
-val region_of_comp_expr:       comp_expr -> Region.t
-val region_of_conj_expr:       conj_expr -> Region.t
-val region_of_disj_expr:       disj_expr -> Region.t
-val region_of_cons_expr:       cons_expr -> Region.t
-val region_of_cat_expr:         cat_expr -> Region.t
+val region_of_pattern : pattern -> Region.t
+val region_of_expr    : expr -> Region.t
 
 (* Removing all outermost parentheses from a given expression *)
 
@@ -408,9 +359,9 @@ val rm_par: expr -> expr
 
 (* Predicates on expressions *)
 
-val is_var:  expr -> bool
-val is_call: expr -> bool
-val is_fun:  expr -> bool
+val is_var  : expr -> bool
+val is_call : expr -> bool
+val is_fun  : expr -> bool
 
 (* Variables *)
 

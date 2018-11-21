@@ -127,12 +127,46 @@ and pattern =
 | Ppar   of pattern par reg
 
 and expr =
-  LetExpr of let_expr reg
-| Fun     of fun_expr
-| If      of conditional reg
-| Tuple   of cat_expr csv reg
-| Match   of match_expr reg
-| CatExpr of cat_expr
+  LetExpr of let_expr reg       (* let [rec] p1 = e1 and p2 = e2 and ... in e *)
+| Fun     of fun_expr           (* fun x -> e                                 *)
+| If      of conditional reg    (* if e1 then e2 else e3                      *)
+| Tuple   of expr csv reg       (* e1, e2, ...                                *)
+| Match   of match_expr reg     (* p1 -> e1 | p2 -> e2 | ...                  *)
+
+| Cat     of (expr * cat * expr) reg                              (* e1  ^ e2 *)
+| Cons    of (expr * cons * expr) reg                             (* e1 :: e2 *)
+
+| Or      of (expr * bool_or * expr) reg                          (* e1 || e2 *)
+| And     of (expr * bool_and * expr) reg                         (* e1 && e2 *)
+
+| Lt      of (expr * lt * expr) reg                               (* e1  < e2 *)
+| LEq     of (expr * le * expr) reg                               (* e1 <= e2 *)
+| Gt      of (expr * gt * expr) reg                               (* e1  > e2 *)
+| GEq     of (expr * ge * expr) reg                               (* e1 >= e2 *)
+| NEq     of (expr * ne * expr) reg                               (* e1 <> e2 *)
+| Eq      of (expr * eq * expr) reg                               (* e1  = e2 *)
+
+| Add     of (expr * plus   * expr) reg                           (* e1  + e2 *)
+| Sub     of (expr * minus  * expr) reg                           (* e1  - e2 *)
+
+| Mult    of (expr * mult    * expr) reg                         (* e1  *  e2 *)
+| Div     of (expr * div     * expr) reg                         (* e1  /  e2 *)
+| Mod     of (expr * kwd_mod * expr) reg                         (* e1 mod e2 *)
+
+| Neg     of (minus   * expr) reg                                    (*    -e *)
+| Not     of (kwd_not * expr) reg                                    (* not e *)
+
+| Call    of (expr * expr) reg                                         (* f e *)
+
+| Int     of Z.t reg                                         (* 12345         *)
+| Var     of var reg                                         (* x             *)
+| Str     of string reg                                      (* "foo"         *)
+| Unit    of unit__ reg                                      (* ()            *)
+| True    of kwd_true                                        (* true          *)
+| False   of kwd_false                                       (* false         *)
+| Par     of expr par reg                                    (* (e)           *)
+| List    of expr ssv bra reg                                (* [e1; e2; ...] *)
+| Extern  of extern
 
 and match_expr = kwd_match * expr * kwd_with * cases * kwd_end
 
@@ -145,62 +179,6 @@ and let_expr =
 and fun_expr = (kwd_fun * var reg * arrow * expr) reg
 
 and conditional = kwd_if * expr * kwd_then * expr * kwd_else * expr
-
-and cat_expr =
-  Cat      of (cons_expr * cat * cat_expr) reg
-| ConsExpr of cons_expr
-
-and cons_expr =
-  Cons     of (disj_expr * cons * cons_expr) reg
-| DisjExpr of disj_expr
-
-and disj_expr =
-  Or       of (disj_expr * bool_or * conj_expr) reg
-| ConjExpr of conj_expr
-
-and conj_expr =
-  And      of (conj_expr * bool_and * comp_expr) reg
-| CompExpr of comp_expr
-
-and comp_expr =
-  Lt      of (comp_expr * lt * add_expr) reg
-| LEq     of (comp_expr * le * add_expr) reg
-| Gt      of (comp_expr * gt * add_expr) reg
-| GEq     of (comp_expr * ge * add_expr) reg
-| NEq     of (comp_expr * ne * add_expr) reg
-| Eq      of (comp_expr * eq * add_expr) reg
-| AddExpr of add_expr
-
-and add_expr =
-  Add      of (add_expr * plus   * mult_expr) reg
-| Sub      of (add_expr * minus  * mult_expr) reg
-| MultExpr of mult_expr
-
-and mult_expr =
-  Mult      of (mult_expr * mult    * unary_expr) reg
-| Div       of (mult_expr * div     * unary_expr) reg
-| Mod       of (mult_expr * kwd_mod * unary_expr) reg
-| UnaryExpr of unary_expr
-
-and unary_expr =
-  Neg     of (minus   * core_expr) reg
-| Not     of (kwd_not * core_expr) reg
-| Primary of primary_expr
-
-and primary_expr =
-  CallExpr of (primary_expr * core_expr) reg
-| CoreExpr of core_expr
-
-and core_expr =
-  Int    of Z.t reg
-| Var    of var reg
-| Str    of string reg
-| Unit   of unit__ reg
-| True   of kwd_true
-| False  of kwd_false
-| Par    of expr par reg
-| List   of expr ssv bra reg
-| Extern of extern
 
 and extern =
   Cast   of cast_expr
@@ -223,24 +201,26 @@ and scanf_expr =
 
 (* Conversions to strings *)
 
+let sprintf = Printf.sprintf
+
 let tuple_to_string to_string csv =
   let apply b a =
     let s = to_string b in
-    if a = "" then s else Printf.sprintf "%s, %s" s a
+    if a = "" then s else sprintf "%s, %s" s a
   in Utils.nsepseq_foldr apply csv ""
 
 let list_to_string to_string ssv =
   let apply e a =
     let s = to_string e in
-    if a = "" then s else Printf.sprintf "%s; %s" s a
-  in Printf.sprintf "[%s]" (Utils.sepseq_foldr apply ssv "")
+    if a = "" then s else sprintf "%s; %s" s a
+  in sprintf "[%s]" (Utils.sepseq_foldr apply ssv "")
 
 (*
 let seq_to_string to_string seq =
   let apply e a =
     let s = to_string e in
-    if a = "" then s else Printf.sprintf "%s; %s" s a
-  in Printf.sprintf "[%s]" (List.fold_right apply seq "")
+    if a = "" then s else sprintf "%s; %s" s a
+  in sprintf "[%s]" (List.fold_right apply seq "")
 
 let nseq_to_string to_string (item, seq) =
   seq_to_string to_string (item::seq)
@@ -249,161 +229,121 @@ let nseq_to_string to_string (item, seq) =
 let rec to_string (statements,_) =
   let apply statement acc =
     let str = statement_to_string statement in
-    if acc = "" then str else Printf.sprintf "%s\n%s" str acc
+    if acc = "" then str else sprintf "%s\n%s" str acc
   in List.fold_right apply statements ""
 
 and statement_to_string = function
   Let (_,(_,let_bindings)) ->
-    Printf.sprintf "Let %s" (let_bindings_to_string let_bindings)
+    sprintf "Let %s" (let_bindings_to_string let_bindings)
 | LetRec (_,(_,_,let_rec_bindings)) ->
-    Printf.sprintf "LetRec %s" (let_rec_bindings_to_string let_rec_bindings)
+    sprintf "LetRec %s" (let_rec_bindings_to_string let_rec_bindings)
 
 and let_rec_bindings_to_string bindings =
   let apply binding acc =
     let str = let_rec_binding_to_string binding in
-    if acc = "" then str else Printf.sprintf "%s\nAnd %s" acc str
+    if acc = "" then str else sprintf "%s\nAnd %s" acc str
   in Utils.nsepseq_foldr apply bindings ""
 
 and let_bindings_to_string bindings =
   let apply binding acc =
     let str = let_binding_to_string binding in
-    if acc = "" then str else Printf.sprintf "%s\nAnd %s" acc str
+    if acc = "" then str else sprintf "%s\nAnd %s" acc str
   in Utils.nsepseq_foldr apply bindings ""
 
 and let_binding_to_string (pattern, _, expr) =
-  Printf.sprintf "%s = %s" (pattern_to_string pattern) (expr_to_string expr)
+  sprintf "%s = %s" (pattern_to_string pattern) (expr_to_string expr)
 
 and let_rec_binding_to_string ((_,var), _, expr) =
-  Printf.sprintf "%s = %s" var (fun_expr_to_string expr)
+  sprintf "%s = %s" var (fun_expr_to_string expr)
 
 and expr_to_string = function
         LetExpr (_,expr) -> let_expr_to_string expr
-|           CatExpr expr -> cat_expr_to_string expr
-|        Tuple (_,exprs) -> tuple_to_string (cat_expr_to_string) exprs
+|        Tuple (_,exprs) -> tuple_to_string (expr_to_string) exprs
 |         Match (_,expr) -> match_expr_to_string expr
 |               Fun expr -> fun_expr_to_string expr
-| If (_,(_,e,_,e1,_,e2)) -> Printf.sprintf "If (%s, %s, %s)"
-                              (expr_to_string e)
-                              (expr_to_string e1)
-                              (expr_to_string e2)
+|              Int (_,z) -> Z.to_string z
+|              Var (_,x) -> x
+|              Str (_,s) -> sprintf "\"%s\"" s
+|                False _ -> "false"
+|                 True _ -> "true"
+|                 Unit _ -> "()"
+|        Par (_,(_,e,_)) -> sprintf "(%s)" (expr_to_string e)
+|       List (_,(_,l,_)) -> list_to_string expr_to_string l
+|               Extern e -> extern_to_string e
+|          Neg (_,(_,e)) -> sprintf "-%s"    (expr_to_string e)
+|          Not (_,(_,e)) -> sprintf "not %s" (expr_to_string e)
+| If (_,(_,e,_,e1,_,e2)) ->
+    sprintf "If (%s, %s, %s)"
+      (expr_to_string e) (expr_to_string e1) (expr_to_string e2)
+| Cat (_,(arg1,_,arg2)) ->
+    sprintf "%s ^ %s" (expr_to_string arg1) (expr_to_string arg2)
+| Cons (_,(hd,_,tl)) ->
+    sprintf "%s::%s"(expr_to_string hd) (expr_to_string tl)
+| Or (_,(e1,_,e2)) ->
+    sprintf "%s || %s" (expr_to_string e1) (expr_to_string e2)
+| And (_,(e1,_,e2)) ->
+    sprintf "%s && %s" (expr_to_string e1) (expr_to_string e2)
+| Lt (_,(e1,_,e2)) ->
+    sprintf "%s < %s" (expr_to_string e1) (expr_to_string e2)
+| LEq (_,(e1,_,e2)) ->
+    sprintf "%s =< %s" (expr_to_string e1) (expr_to_string e2)
+| Gt (_,(e1,_,e2)) ->
+    sprintf "%s > %s" (expr_to_string e1) (expr_to_string e2)
+| GEq (_,(e1,_,e2)) ->
+    sprintf "%s >= %s" (expr_to_string e1) (expr_to_string e2)
+| Eq (_,(e1,_,e2)) ->
+    sprintf "%s = %s" (expr_to_string e1) (expr_to_string e2)
+| NEq (_,(e1,_,e2)) ->
+    sprintf "%s <> %s" (expr_to_string e1) (expr_to_string e2)
+| Add (_,(e1,_,e2)) ->
+    sprintf "Add (%s, %s)" (expr_to_string e1) (expr_to_string e2)
+| Sub (_,(e1,_,e2)) ->
+    sprintf "Sub (%s, %s)" (expr_to_string e1) (expr_to_string e2)
+| Mult (_,(e1,_,e2)) ->
+    sprintf "Mult (%s, %s)" (expr_to_string e1) (expr_to_string e2)
+| Div (_,(e1,_,e2)) ->
+    sprintf "Div (%s, %s)" (expr_to_string e1) (expr_to_string e2)
+| Mod (_,(e1,_,e2)) ->
+    sprintf "Mod (%s, %s)" (expr_to_string e1) (expr_to_string e2)
+| Call (_,(func,arg)) ->
+    sprintf "Call (%s, %s)" (expr_to_string func) (expr_to_string arg)
 
 and match_expr_to_string (_,expr,_,cases,_) =
-  Printf.sprintf "Match (%s, %s)" (expr_to_string expr)
-                                  (cases_to_string cases)
+  sprintf "Match (%s, %s)" (expr_to_string expr) (cases_to_string cases)
 
 and cases_to_string cases =
   let apply case acc =
     let str = case_to_string case in
-    if acc = "" then str else Printf.sprintf "%s\n| %s" acc str
+    if acc = "" then str else sprintf "%s\n| %s" acc str
   in Utils.nsepseq_foldr apply cases ""
 
 and case_to_string (pattern, _arrow, expr) =
-  Printf.sprintf "%s -> %s" (pattern_to_string pattern)
-                            (expr_to_string expr)
+  sprintf "%s -> %s" (pattern_to_string pattern) (expr_to_string expr)
 
 and fun_expr_to_string (_,(_,(_,var),_,expr)) =
-  Printf.sprintf "Fun (%s, %s)" var (expr_to_string expr)
+  sprintf "Fun (%s, %s)" var (expr_to_string expr)
 
 and let_expr_to_string = function
   LetIn (_,bindings,_, e) ->
-    Printf.sprintf "LetIn ([%s], %s)"
+    sprintf "LetIn ([%s], %s)"
       (let_bindings_to_string bindings) (expr_to_string e)
 | LetRecIn (_,_,bindings,_, e) ->
-    Printf.sprintf "LetRecIn ([%s], %s)"
+    sprintf "LetRecIn ([%s], %s)"
       (let_rec_bindings_to_string bindings) (expr_to_string e)
 
 and pattern_to_string = function
   Ptuple (_,p)        -> tuple_to_string pattern_to_string p
 | Plist  (_,(_,p,_))  -> list_to_string pattern_to_string p
 | Pvar (_,var)        -> var
-| Ppar (_,(_,p,_))    -> Printf.sprintf "(%s)" (pattern_to_string p)
+| Ppar (_,(_,p,_))    -> sprintf "(%s)" (pattern_to_string p)
 | Punit _             -> "()"
 | Pint (_,z)          -> Z.to_string z
 | Ptrue _             -> "true"
 | Pfalse _            -> "false"
-| Pstr (_,s)          -> Printf.sprintf "\"%s\"" s
+| Pstr (_,s)          -> sprintf "\"%s\"" s
 | Pwild _             -> "_"
-| Pcons (_,(p1,_,p2)) -> Printf.sprintf "(%s::%s)"
+| Pcons (_,(p1,_,p2)) -> sprintf "(%s::%s)"
                           (pattern_to_string p1) (pattern_to_string p2)
-
-and cat_expr_to_string = function
-  Cat (_,(arg1,_,arg2)) -> Printf.sprintf "%s ^ %s"
-                            (cons_expr_to_string arg1)
-                            (cat_expr_to_string arg2)
-|            ConsExpr e -> cons_expr_to_string e
-
-and cons_expr_to_string = function
-  Cons (_,(hd,_,tl)) ->
-    Printf.sprintf "%s::%s" (disj_expr_to_string hd) (cons_expr_to_string tl)
-| DisjExpr e -> disj_expr_to_string e
-
-and disj_expr_to_string = function
-  Or (_,(e1,_,e2)) ->
-    Printf.sprintf "%s || %s" (disj_expr_to_string e1) (conj_expr_to_string e2)
-| ConjExpr e -> conj_expr_to_string e
-
-and conj_expr_to_string = function
-  And (_,(e1,_,e2)) ->
-    Printf.sprintf "%s && %s" (conj_expr_to_string e1) (comp_expr_to_string e2)
-| CompExpr e -> comp_expr_to_string e
-
-and comp_expr_to_string = function
-  Lt (_,(e1,_,e2)) ->
-    Printf.sprintf "%s < %s" (comp_expr_to_string e1) (add_expr_to_string e2)
-| LEq (_,(e1,_,e2)) ->
-    Printf.sprintf "%s =< %s" (comp_expr_to_string e1) (add_expr_to_string e2)
-| Gt (_,(e1,_,e2)) ->
-    Printf.sprintf "%s > %s" (comp_expr_to_string e1) (add_expr_to_string e2)
-| GEq (_,(e1,_,e2)) ->
-    Printf.sprintf "%s >= %s" (comp_expr_to_string e1) (add_expr_to_string e2)
-| Eq (_,(e1,_,e2)) ->
-    Printf.sprintf "%s = %s" (comp_expr_to_string e1) (add_expr_to_string e2)
-| NEq (_,(e1,_,e2)) ->
-    Printf.sprintf "%s <> %s" (comp_expr_to_string e1) (add_expr_to_string e2)
-| AddExpr e -> add_expr_to_string e
-
-and add_expr_to_string = function
-   Add (_,(e1,_,e2)) -> Printf.sprintf "Add (%s, %s)"
-                          (add_expr_to_string e1)
-                          (mult_expr_to_string e2)
-|  Sub (_,(e1,_,e2)) -> Printf.sprintf "Sub (%s, %s)"
-                          (add_expr_to_string e1)
-                          (mult_expr_to_string e2)
-|         MultExpr e -> mult_expr_to_string e
-
-and mult_expr_to_string = function
-   Mult (_,(e1,_,e2)) -> Printf.sprintf "Mult (%s, %s)"
-                           (mult_expr_to_string e1)
-                           (unary_expr_to_string e2)
-|   Div (_,(e1,_,e2)) -> Printf.sprintf "Div (%s, %s)"
-                           (mult_expr_to_string e1)
-                           (unary_expr_to_string e2)
-|   Mod (_,(e1,_,e2)) -> Printf.sprintf "Mod (%s, %s)"
-                           (mult_expr_to_string e1)
-                           (unary_expr_to_string e2)
-|         UnaryExpr e -> unary_expr_to_string e
-
-and unary_expr_to_string = function
-   Neg (_,(_,e)) -> Printf.sprintf "-%s"    (core_expr_to_string e)
-|  Not (_,(_,e)) -> Printf.sprintf "not %s" (core_expr_to_string e)
-|      Primary e -> primary_expr_to_string e
-
-and primary_expr_to_string = function
-  CallExpr (_,(func,arg)) -> Printf.sprintf "CallExpr (%s, %s)"
-                              (primary_expr_to_string func)
-                              (core_expr_to_string arg)
-| CoreExpr e -> core_expr_to_string e
-
-and core_expr_to_string = function
-         Int (_,z) -> Z.to_string z
-|        Var (_,x) -> x
-|        Str (_,s) -> Printf.sprintf "\"%s\"" s
-|          False _ -> "false"
-|           True _ -> "true"
-|           Unit _ -> "()"
-|  Par (_,(_,e,_)) -> Printf.sprintf "(%s)" (expr_to_string e)
-| List (_,(_,l,_)) -> list_to_string expr_to_string l
-|         Extern e -> extern_to_string e
 
 and extern_to_string = function
     Cast e -> cast_to_string   e
@@ -411,164 +351,57 @@ and extern_to_string = function
 |  Scanf e -> scanf_to_string  e
 | PolyEq e -> polyeq_to_string e
 
-and polyeq_to_string (x,y) = Printf.sprintf "equal %s %s" x y
+and polyeq_to_string (x,y) = sprintf "equal %s %s" x y
 
 and print_to_string = function
-  PrintString var -> Printf.sprintf "print_string %s" var
-| PrintInt    var -> Printf.sprintf "print_int %s"    var
+  PrintString var -> sprintf "print_string %s" var
+| PrintInt    var -> sprintf "print_int %s"    var
 
 and cast_to_string = function
-  StringOfInt  var -> Printf.sprintf "string_of_int %s"  var
-| StringOfBool var -> Printf.sprintf "string_of_bool %s" var
+  StringOfInt  var -> sprintf "string_of_int %s"  var
+| StringOfBool var -> sprintf "string_of_bool %s" var
 
 and scanf_to_string = function
-  ScanfInt    var -> Printf.sprintf "scanf_int %s"    var
-| ScanfString var -> Printf.sprintf "scanf_string %s" var
-| ScanfBool   var -> Printf.sprintf "scanf_bool %s"   var
+  ScanfInt    var -> sprintf "scanf_int %s"    var
+| ScanfString var -> sprintf "scanf_string %s" var
+| ScanfBool   var -> sprintf "scanf_bool %s"   var
 
 (* Projecting regions of the input source code *)
 
-let rec region_of_pattern = function
+let region_of_pattern = function
   Plist (r,_) | Ptuple (r,_) | Pvar (r,_)
 | Punit (r,_) | Pint (r,_) | Ptrue r | Pfalse r
 | Pstr (r,_) | Pwild r | Pcons (r,_) | Ppar (r,_) -> r
 
-and region_of_unary_expr = function
-  Neg (r,_) | Not (r,_) -> r
-| Primary e -> region_of_primary_expr e
-
-and region_of_mult_expr = function
-  Mult (r,_) | Div (r,_) | Mod (r,_) -> r
-| UnaryExpr e -> region_of_unary_expr e
-
-and region_of_add_expr = function
-  Add (r,_) | Sub (r,_) -> r
-| MultExpr e -> region_of_mult_expr e
-
-and region_of_comp_expr = function
-   Lt (r,_) | LEq (r,_) | Gt (r,_)
-| GEq (r,_) | NEq (r,_) | Eq (r,_) -> r
-| AddExpr e -> region_of_add_expr e
-
-and region_of_conj_expr = function
-   And (r,_) -> r
-| CompExpr e -> region_of_comp_expr e
-
-and region_of_disj_expr = function
-    Or (r,_) -> r
-| ConjExpr e -> region_of_conj_expr e
-
-and region_of_cons_expr = function
-  Cons (r,_) -> r
-| DisjExpr e -> region_of_disj_expr e
-
-and region_of_cat_expr = function
-   Cat (r,_) -> r
-| ConsExpr e -> region_of_cons_expr e
-
-and region_of_expr = function
-  LetExpr (r,_) | Fun (r,_) | If (r,_) | Tuple (r,_) | Match (r,_) -> r
-| CatExpr e -> region_of_cat_expr e
-
-and region_of_core_expr = function
-   Int (r,_) | Var (r,_) | Str (r,_)
-| Unit (r,_) | True r    | False r
-| List (r,_) | Par (r,_) -> r
+let region_of_expr = function
+  LetExpr (r,_) | Fun (r,_) | If (r,_) | Tuple (r,_) | Match (r,_)
+| Cat (r,_) | Cons (r,_) | Or (r,_) | And (r,_) | Lt (r,_) | LEq (r,_)
+| Gt (r,_) | GEq (r,_) | NEq (r,_) | Eq (r,_) | Add (r,_) | Sub (r,_)
+| Mult (r,_) | Div (r,_) | Mod (r,_) | Neg (r,_) | Not (r,_) | Call (r,_)
+| Int (r,_) | Var (r,_) | Str (r,_) | Unit (r,_) | True r | False r
+| Par (r,_) | List (r,_) -> r
 | Extern _ -> Region.ghost
-
-and region_of_primary_expr = function
-  CallExpr (r,_) -> r
-|     CoreExpr e -> region_of_core_expr e
 
 (* Predicates *)
 
 let rec is_var = function
-  CatExpr
-   (ConsExpr
-     (DisjExpr
-       (ConjExpr
-         (CompExpr
-           (AddExpr
-             (MultExpr (UnaryExpr (Primary p)))))))) -> is_prim_a_var p
-| _ -> false
-
-and is_prim_a_var = function
-  CoreExpr e -> is_core_a_var e
-|          _ -> false
-
-and is_core_a_var = function
   Par (_,(_,e,_)) -> is_var e
 |           Var _ -> true
 |               _ -> false
 
 let rec is_call = function
-  CatExpr
-   (ConsExpr
-     (DisjExpr
-       (ConjExpr
-         (CompExpr
-           (AddExpr
-             (MultExpr (UnaryExpr (Primary p)))))))) -> is_prim_a_call p
-| _ -> false
-
-and is_prim_a_call = function
-  CoreExpr e -> is_core_a_call e
-| CallExpr _ -> true
-
-and is_core_a_call = function
   Par (_,(_,e,_)) -> is_call e
+|          Call _ -> true
 |               _ -> false
 
 let rec is_fun = function
-  Fun _ -> true
-| CatExpr
-   (ConsExpr
-     (DisjExpr
-       (ConjExpr
-         (CompExpr
-           (AddExpr
-             (MultExpr
-               (UnaryExpr
-                 (Primary
-                    (CoreExpr (Par (_,(_,e,_)))))))))))) -> is_fun e
-| _ -> false
-
+  Par (_,(_,e,_)) -> is_fun e
+|           Fun _ -> true
+|               _ -> false
 
 let rec rm_par = function
-  CatExpr
-   (ConsExpr
-     (DisjExpr
-       (ConjExpr
-         (CompExpr
-           (AddExpr
-             (MultExpr
-               (UnaryExpr
-                 (Primary
-                    (CoreExpr (Par (_,(_,e,_)))))))))))) -> rm_par e
-| e -> e
-
-(* Rewriting the AST *)
-
-let var_to_unary_expr v = Primary   (CoreExpr (Var v))
-let var_to_mult_expr  v = UnaryExpr (var_to_unary_expr v)
-let var_to_add_expr   v = MultExpr  (var_to_mult_expr v)
-let var_to_comp_expr  v = AddExpr   (var_to_add_expr v)
-let var_to_conj_expr  v = CompExpr  (var_to_comp_expr v)
-let var_to_disj_expr  v = ConjExpr  (var_to_conj_expr v)
-let var_to_cons_expr  v = DisjExpr  (var_to_disj_expr v)
-let var_to_cat_expr   v = ConsExpr  (var_to_cons_expr v)
-let var_to_expr       v = CatExpr   (var_to_cat_expr v)
-
-let primary_to_expr e =
-  CatExpr
-   (ConsExpr
-     (DisjExpr
-       (ConjExpr
-         (CompExpr
-           (AddExpr
-             (MultExpr (UnaryExpr (Primary e))))))))
-
-let core_to_expr e = primary_to_expr (CoreExpr e)
+  Par (_,(_,e,_)) -> rm_par e
+|               e -> e
 
 (* Rewriting let-expressions and fun-expressions, with some optimisations *)
 
@@ -583,7 +416,7 @@ let norm_fun reg kwd_fun pattern eq expr =
     Pvar v -> kwd_fun, v, eq, expr
   |      _ -> let open Region in
               let fresh    = ghost, gen_sym () in
-              let bindings = (pattern, eq, var_to_expr fresh), [] in
+              let bindings = (pattern, eq, Var fresh), [] in
               let let_in   = LetIn (ghost_let, bindings, ghost_in, expr) in
               let expr     = LetExpr (ghost, let_in)
               in kwd_fun, fresh, ghost_arrow, expr
@@ -698,33 +531,26 @@ and print_let_rec_binding undo (var,eq,expr) =
   print_let_binding undo (Pvar var, eq, Fun expr)
 
 and print_pattern = function
-  Ptuple (_,patterns) ->
-    print_csv print_pattern patterns
+  Ptuple (_,patterns) -> print_csv print_pattern patterns
 | Plist (_,(lbra,patterns,rbra)) ->
     print_token lbra "[";
     print_ssv print_pattern patterns;
     print_token rbra "]"
-| Pvar (reg,var) ->
-    Printf.printf "%s: Pvar %s\n" (Region.compact reg) var
-| Punit (_,(lpar,rpar)) ->
-    print_token lpar "("; print_token rpar ")"
-| Pint (reg,z) ->
-    print_token reg (Printf.sprintf "(Int %s)" (Z.to_string z))
+| Pvar (reg,var) -> Printf.printf "%s: Pvar %s\n" (Region.compact reg) var
+| Punit (_,(lpar,rpar)) -> print_token lpar "("; print_token rpar ")"
+| Pint (reg,z) -> print_token reg (sprintf "(Int %s)" (Z.to_string z))
 | Ptrue kwd_true -> print_token kwd_true "true"
 | Pfalse kwd_false -> print_token kwd_false "false"
 | Pstr s -> print_str s
-| Pwild wild ->
-    print_token wild "_"
-| Pcons (_,(p1,c,p2)) ->
-    print_pattern p1; print_token c "::"; print_pattern p2
+| Pwild wild -> print_token wild "_"
+| Pcons (_,(p1,c,p2)) -> print_pattern p1; print_token c "::"; print_pattern p2
 | Ppar (_,(lpar,p,rpar)) ->
     print_token lpar "("; print_pattern p; print_token rpar ")"
 
 and print_expr undo = function
   LetExpr (_,e) -> print_let_expr undo e
 |      If (_,e) -> print_conditional undo e
-| Tuple (_,csv) -> print_csv (print_cat_expr undo) csv
-|     CatExpr e -> print_cat_expr undo e
+| Tuple (_,csv) -> print_csv (print_expr undo) csv
 |   Match (_,e) -> print_match_expr undo e
 | Fun (_,((kwd_fun,_,_,_) as f)) as e ->
     if undo then
@@ -734,6 +560,51 @@ and print_expr undo = function
       print_token arrow "->";
       print_expr undo expr
     else print_fun_expr undo f
+| Cat (_,(e1,cons,e2)) ->
+    print_expr undo e1; print_token cons "^"; print_expr undo e2
+| Cons (_,(e1,cons,e2)) ->
+    print_expr undo e1; print_token cons "::"; print_expr undo e2
+| Or (_,(e1,bool_or,e2)) ->
+    print_expr undo e1; print_token bool_or "||"; print_expr undo e2
+| And (_,(e1,bool_and,e2)) ->
+    print_expr undo e1; print_token bool_and "&&"; print_expr undo e2
+| Lt (_,(e1,lt,e2)) ->
+    print_expr undo e1; print_token lt "<"; print_expr undo e2
+| LEq (_,(e1,le,e2)) ->
+    print_expr undo e1; print_token le "<="; print_expr undo e2
+| Gt (_,(e1,gt,e2)) ->
+    print_expr undo e1; print_token gt ">"; print_expr undo e2
+| GEq (_,(e1,ge,e2)) ->
+    print_expr undo e1; print_token ge ">="; print_expr undo e2
+| NEq (_,(e1,ne,e2)) ->
+    print_expr undo e1; print_token ne "<>"; print_expr undo e2
+| Eq (_,(e1,eq,e2)) ->
+    print_expr undo e1; print_token eq "="; print_expr undo e2
+| Add (_,(e1,plus,e2)) ->
+    print_expr undo e1; print_token plus "+"; print_expr undo e2
+| Sub (_,(e1,minus,e2)) ->
+    print_expr undo e1; print_token minus "-"; print_expr undo e2
+| Mult (_,(e1,mult,e2)) ->
+    print_expr undo e1; print_token mult "*"; print_expr undo e2
+| Div (_,(e1,div,e2)) ->
+    print_expr undo e1; print_token div "/"; print_expr undo e2
+| Mod (_,(e1,kwd_mod,e2)) ->
+    print_expr undo e1; print_token kwd_mod "mod"; print_expr undo e2
+| Neg (_,(minus,e)) -> print_token minus "-"; print_expr undo e
+| Not (_,(kwd_not,e)) -> print_token kwd_not "not"; print_expr undo e
+| Call (_,(e1,e2)) -> print_expr undo e1; print_expr undo e2
+| Int (r,z) -> print_token r (sprintf "Int %s" (Z.to_string z))
+| Var v -> print_var v
+| Str s -> print_str s
+| Unit (_,(lpar,rpar)) ->
+    print_token lpar "("; print_token rpar ")"
+| True kwd_true -> print_token kwd_true "true"
+| False kwd_false -> print_token kwd_false "false"
+| Par (_,(lpar,e,rpar)) ->
+    print_token lpar "("; print_expr undo e; print_token rpar ")"
+| List (_,(lbra,ssv,rbra)) ->
+    print_token lbra "["; print_ssv (print_expr undo) ssv; print_token rbra "]"
+| Extern _ -> ()
 
 and print_match_expr undo (kwd_match, expr, kwd_with, cases, kwd_end) =
   print_token kwd_match "(match";
@@ -773,80 +644,6 @@ and print_conditional undo (kwd_if, e1, kwd_then, e2, kwd_else, e3) =
   print_expr undo e2;
   print_token kwd_else "else";
   print_expr undo e3
-
-and print_cat_expr undo = function
-  Cat (_,(e1,cons,e2)) ->
-    print_cons_expr undo e1; print_token cons "^"; print_cat_expr undo e2
-| ConsExpr e -> print_cons_expr undo e
-
-and print_cons_expr undo = function
-  Cons (_,(e1,cons,e2)) ->
-    print_disj_expr undo e1; print_token cons "::"; print_cons_expr undo e2
-| DisjExpr e -> print_disj_expr undo e
-
-and print_disj_expr undo = function
-  Or (_,(e1,bool_or,e2)) ->
-    print_disj_expr undo e1; print_token bool_or "||"; print_conj_expr undo e2
-| ConjExpr e -> print_conj_expr undo e
-
-and print_conj_expr undo = function
-  And (_,(e1,bool_and,e2)) ->
-    print_conj_expr undo e1; print_token bool_and "&&"; print_comp_expr undo e2
-| CompExpr e -> print_comp_expr undo e
-
-and print_comp_expr undo = function
-  Lt (_,(e1,lt,e2)) ->
-    print_comp_expr undo e1; print_token lt "<"; print_add_expr undo e2
-| LEq (_,(e1,le,e2)) ->
-    print_comp_expr undo e1; print_token le "<="; print_add_expr undo e2
-| Gt (_,(e1,gt,e2)) ->
-    print_comp_expr undo e1; print_token gt ">"; print_add_expr undo e2
-| GEq (_,(e1,ge,e2)) ->
-    print_comp_expr undo e1; print_token ge ">="; print_add_expr undo e2
-| NEq (_,(e1,ne,e2)) ->
-    print_comp_expr undo e1; print_token ne "<>"; print_add_expr undo e2
-| Eq (_,(e1,eq,e2)) ->
-    print_comp_expr undo e1; print_token eq "="; print_add_expr undo e2
-| AddExpr e -> print_add_expr undo e
-
-and print_add_expr undo = function
-  Add (_,(e1,plus,e2)) ->
-    print_add_expr undo e1; print_token plus "+"; print_mult_expr undo e2
-| Sub (_,(e1,minus,e2)) ->
-    print_add_expr undo e1; print_token minus "-"; print_mult_expr undo e2
-| MultExpr e -> print_mult_expr undo e
-
-and print_mult_expr undo = function
-  Mult (_,(e1,mult,e2)) ->
-    print_mult_expr undo e1; print_token mult "*"; print_unary_expr undo e2
-| Div (_,(e1,div,e2)) ->
-    print_mult_expr undo e1; print_token div "/"; print_unary_expr undo e2
-| Mod (_,(e1,kwd_mod,e2)) ->
-    print_mult_expr undo e1; print_token kwd_mod "mod"; print_unary_expr undo e2
-| UnaryExpr e -> print_unary_expr undo e
-
-and print_unary_expr undo = function
-    Neg (_,(minus,e)) -> print_token minus "-"; print_core_expr undo e
-| Not (_,(kwd_not,e)) -> print_token kwd_not "not"; print_core_expr undo e
-|           Primary e -> print_primary_expr undo e
-
-and print_primary_expr undo = function
-  CallExpr (_,(e1,e2)) -> print_primary_expr undo e1; print_core_expr undo e2
-| CoreExpr e -> print_core_expr undo e
-
-and print_core_expr undo = function
-  Int (r,z) -> print_token r (Printf.sprintf "Int %s" (Z.to_string z))
-| Var v -> print_var v
-| Str s -> print_str s
-| Unit (_,(lpar,rpar)) ->
-    print_token lpar "("; print_token rpar ")"
-| True kwd_true -> print_token kwd_true "true"
-| False kwd_false -> print_token kwd_false "false"
-| Par (_,(lpar,e,rpar)) ->
-    print_token lpar "("; print_expr undo e; print_token rpar ")"
-| List (_,(lbra,ssv,rbra)) ->
-    print_token lbra "["; print_ssv (print_expr undo) ssv; print_token rbra "]"
-| Extern _ -> ()
 
 (* Variables (free and bound) *)
 
@@ -896,10 +693,31 @@ and pattern_vars fv = function
 and fv_expr env fv = function
             LetExpr (_,e) -> fv_let_expr (env, fv) e
 |   Fun (_,(_,(_,v),_,e)) -> fv_expr (Vars.add v env) fv e
-|               CatExpr e -> fv_cat_expr env fv e
-|         Tuple (_,comps) -> nsepseq_foldl (fv_cat_expr env) fv comps
+|         Tuple (_,comps) -> nsepseq_foldl (fv_expr env) fv comps
 |             Match (_,e) -> fv_match_expr env fv e
 | If (_,(_,e1,_,e2,_,e3)) -> let f = fv_expr env in f (f (f fv e1) e2) e3
+|       Cat (_,(e1,_,e2))
+|      Cons (_,(e1,_,e2))
+|        Or (_,(e1,_,e2))
+|       And (_,(e1,_,e2))
+|        Lt (_,(e1,_,e2))
+|       LEq (_,(e1,_,e2))
+|        Gt (_,(e1,_,e2))
+|       GEq (_,(e1,_,e2))
+|        Eq (_,(e1,_,e2))
+|       NEq (_,(e1,_,e2))
+|       Add (_,(e1,_,e2))
+|       Sub (_,(e1,_,e2))
+|      Mult (_,(e1,_,e2))
+|      Div  (_,(e1,_,e2))
+|       Mod (_,(e1,_,e2))
+|        Call (_,(e1,e2)) -> fv_expr env (fv_expr env fv e1) e2
+|           Neg (_,(_,e))
+|           Not (_,(_,e))
+|         Par (_,(_,e,_)) -> fv_expr env fv e
+|          Var (_,x as v) -> if Vars.mem x env then fv else FreeVars.add v fv
+|        List (_,(_,l,_)) -> sepseq_foldl (fv_expr env) fv l
+| Int _ | Str _ | Unit _ | True _ | False _ | Extern _ -> fv
 
 and fv_match_expr env fv (_, expr, _, cases,_) =
   fv_cases env (fv_expr env fv expr) cases
@@ -914,60 +732,6 @@ and fv_let_expr state = function
     (uncurry fv_expr) (fv_let_bindings state bindings) expr
 | LetRecIn (_,_,bindings,_,expr) ->
     (uncurry fv_expr) (fv_let_rec_bindings state bindings) expr
-
-and fv_cat_expr env fv = function
-  Cat (_,(e1,_,e2)) -> fv_cat_expr env (fv_cons_expr env fv e1) e2
-|        ConsExpr e -> fv_cons_expr env fv e
-
-and fv_cons_expr env fv = function
-  Cons (_,(e1,_,e2)) -> fv_cons_expr env (fv_disj_expr env fv e1) e2
-|         DisjExpr e -> fv_disj_expr env fv e
-
-and fv_disj_expr env fv = function
-  Or (_,(e1,_,e2)) -> fv_conj_expr env (fv_disj_expr env fv e1) e2
-|       ConjExpr e -> fv_conj_expr env fv e
-
-and fv_conj_expr env fv = function
-  And (_,(e1,_,e2)) -> fv_comp_expr env (fv_conj_expr env fv e1) e2
-|        CompExpr e -> fv_comp_expr env fv e
-
-and fv_comp_expr env fv = function
-  Lt (_,(e1,_,e2)) | LEq (_,(e1,_,e2))
-| Gt (_,(e1,_,e2)) | GEq (_,(e1,_,e2))
-| Eq (_,(e1,_,e2)) | NEq (_,(e1,_,e2)) ->
-    fv_add_expr env (fv_comp_expr env fv e1) e2
-| AddExpr e -> fv_add_expr env fv e
-
-and fv_add_expr env fv = function
-  Add (_,(e1,_,e2)) | Sub (_,(e1,_,e2)) ->
-    fv_mult_expr env (fv_add_expr env fv e1) e2
-| MultExpr e -> fv_mult_expr env fv e
-
-and fv_mult_expr env fv = function
-  Mult (_,(e1,_,e2)) | Div  (_,(e1,_,e2)) | Mod (_,(e1,_,e2)) ->
-    fv_unary_expr env (fv_mult_expr env fv e1) e2
-| UnaryExpr e -> fv_unary_expr env fv e
-
-and fv_unary_expr env fv = function
-  Neg (_,(_,e)) | Not (_,(_,e)) ->
-    fv_core_expr env fv e
-| Primary e -> fv_primary_expr env fv e
-
-and fv_primary_expr env fv = function
-      CoreExpr e -> fv_core_expr env fv e
-| CallExpr (_,e) -> fv_call_expr env fv e
-
-and fv_call_expr env fv (e1,e2) =
-  fv_core_expr env (fv_primary_expr env fv e1) e2
-
-and fv_core_expr env fv = function
-  Int _ | Str _ | Unit _ | True _ | False _ | Extern _ -> fv
-|  Par (_,(_,e,_)) -> fv_expr env fv e
-|            Var v -> fv_var  env fv v
-| List (_,(_,l,_)) -> sepseq_foldl (fv_expr env) fv l
-
-and fv_var env fv (_,x as v) =
-  if Vars.mem x env then fv else FreeVars.add v fv
 
 let init_env = Vars.empty
              |> Vars.add "string_of_int"

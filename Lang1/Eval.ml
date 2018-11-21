@@ -332,7 +332,6 @@ and eval_let_rec_bindings state bindings =
 
 and eval_expr state = function
       LetExpr (_,e) -> eval_let_expr state e
-|         CatExpr e -> eval_cat_expr state e
 |  Tuple components -> eval_tuple state components
 |       Match (_,e) -> eval_match state e
 | Fun (r,(_,x,_,e)) ->
@@ -341,10 +340,137 @@ and eval_expr state = function
 | If (_,(_, cond,_, if_true, _, otherwise)) ->
     let thread, value = eval_expr state cond in
     let eval = eval_expr State.{state with thread} in
-    match value with
-      Value.Bool (_, true)  -> eval if_true
-    | Value.Bool (_, false) -> eval otherwise
-    | _ -> raise (Type_error (state, __LOC__))
+    (match value with
+       Value.Bool (_, true)  -> eval if_true
+     | Value.Bool (_, false) -> eval otherwise
+     | _ -> raise (Type_error (state, __LOC__)))
+| Cat (reg,(arg1,_,arg2)) ->
+    let thread, v1 = eval_expr state arg1 in
+    let thread, v2 = eval_expr  State.{state with thread} arg2 in
+    (match v1, v2 with
+      Value.Str (_,s1), Value.Str (_,s2) -> thread, Value.Str (reg, s1 ^ s2)
+    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+| Cons (reg,(head,_,tail)) ->
+    let thread, v2 = eval_expr state tail in
+    let thread, v1 = eval_expr State.{state with thread} head in
+    (match v2 with
+      Value.List (_,l2) -> thread, Value.List (reg, v1::l2)
+    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+| Or (reg,(e1,_,e2)) ->
+    let thread, v1 = eval_expr state e1 in
+    let thread, v2 = eval_expr State.{state with thread} e2 in
+    let open Value in
+    (match v1, v2 with
+      Bool (_,b1), Bool (_,b2) -> thread, Bool (reg, b1 || b2)
+    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+| And (reg,(e1,_,e2)) ->
+    let thread, v1 = eval_expr state e1 in
+    let thread, v2 = eval_expr State.{state with thread} e2 in
+    let open Value in
+    (match v1, v2 with
+      Bool (_,b1), Bool (_,b2) -> thread, Bool (reg, b1 &&b2)
+    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+|  Lt (reg,(e1,_,e2)) ->
+    let thread, v1 = eval_expr state e1 in
+    let thread, v2 = eval_expr State.{state with thread} e2 in
+    thread,
+    Value.Bool (reg,
+          match v1, v2 with
+            Value.Int (_,z1), Value.Int (_,z2) -> Z.lt z1 z2
+          | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+| LEq (reg,(e1,_,e2)) ->
+    let thread, v1 = eval_expr state e1 in
+    let thread, v2 = eval_expr State.{state with thread} e2 in
+    thread,
+    Value.Bool (reg,
+          match v1, v2 with
+            Value.Int (_,z1), Value.Int (_,z2) -> Z.leq z1 z2
+          | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+| Gt (reg,(e1,_,e2)) ->
+    let thread, v1 = eval_expr state e1 in
+    let thread, v2 = eval_expr State.{state with thread} e2 in
+    thread,
+    Value.Bool (reg,
+          match v1, v2 with
+            Value.Int (_,z1), Value.Int (_,z2) -> Z.gt z1 z2
+          | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+| GEq (reg,(e1,_,e2)) ->
+    let thread, v1 = eval_expr state e1 in
+    let thread, v2 = eval_expr State.{state with thread} e2 in
+    thread,
+    Value.Bool (reg,
+          match v1, v2 with
+            Value.Int (_,z1), Value.Int (_,z2) -> Z.geq z1 z2
+          | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+| NEq (reg,(e1,_,e2)) ->
+    let thread, v1 = eval_expr state e1 in
+    let thread, v2 = eval_expr State.{state with thread} e2
+    in thread, Value.(Bool (reg, not (eq thread v1 v2)))
+| Eq (reg,(e1,_,e2)) ->
+    let thread, v1 = eval_expr state e1 in
+    let thread, v2 = eval_expr State.{state with thread} e2
+    in thread, Value.(Bool (reg, eq thread v1 v2))
+| Add (reg,(e1,_,e2)) ->
+    let thread, v1 = eval_expr state e1 in
+    let thread, v2 = eval_expr State.{state with thread} e2 in
+    thread,
+    (match v1, v2 with
+       Value.Int (_,z1), Value.Int (_,z2) -> Value.Int (reg, Z.(+) z1 z2)
+    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+| Sub (reg,(e1,_,e2)) ->
+    let thread, v1 = eval_expr state e1 in
+    let thread, v2 = eval_expr State.{state with thread} e2 in
+    thread,
+    (match v1, v2 with
+       Value.Int (_,z1), Value.Int (_,z2) -> Value.Int (reg, Z.(-) z1 z2)
+    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+| Mult (reg,(e1,_,e2)) ->
+    let thread, v1 = eval_expr state e1 in
+    let thread, v2 = eval_expr State.{state with thread} e2 in
+    thread,
+    (match v1, v2 with
+      Value.Int (_,z1), Value.Int (_,z2) -> Value.Int (reg, Z.( * ) z1 z2)
+    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+| Div (reg,(e1,_,e2)) ->
+    let thread, v1 = eval_expr state e1 in
+    let thread, v2 = eval_expr State.{state with thread} e2 in
+    thread,
+    (match v1, v2 with
+      Value.Int (_,z1), Value.Int (_,z2) ->
+        if Z.equal z2 Z.zero then
+          raise (Div_by_zero (State.{state with thread},
+                              region_of_expr e2))
+        else Value.Int (reg, Z.(/) z1 z2)
+    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+| Mod (reg,(e1,_,e2)) ->
+    let thread, v1 = eval_expr state e1 in
+    let thread, v2 = eval_expr State.{state with thread} e2 in
+    thread,
+    (match v1, v2 with
+      Value.Int (_,z1), Value.Int (_,z2) -> Value.Int (reg, Z.(mod) z1 z2)
+    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+| Not (r,(_,e)) ->
+    let thread, v = eval_expr state e in
+    (match v with
+      Value.Bool (_,b) -> thread, Value.Bool (r, not b)
+    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+| Neg (r,(_,e)) ->
+    let thread, v = eval_expr state e in
+    (match v with
+      Value.Int (_,z) -> thread, Value.Int (r, Z.neg z)
+    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
+
+|          Call e -> eval_call_expr state e
+|           Int z -> state.State.thread, Value.Int z
+|           Str s -> state.State.thread, Value.Str s
+|      Unit (r,_) -> state.State.thread, Value.Unit r
+|        True reg -> state.State.thread, Value.Bool (reg, true)
+|       False reg -> state.State.thread, Value.Bool (reg, false)
+|  Var (r,_ as v) -> state.State.thread,
+                    Value.set_region r (Env.find v state.State.env)
+| Par (_,(_,e,_)) -> eval_expr state e
+|          List l -> eval_expr_list state l
+|        Extern e -> eval_external state e
 
 and eval_match state (_, expr, _, cases, _) =
   let env = state.State.env in
@@ -365,7 +491,7 @@ and eval_cases env state value (case, cases) =
 
 and eval_tuple state (region,exprs) =
   let apply expr (thread,values) =
-    let thread, value = eval_cat_expr State.{state with thread} expr
+    let thread, value = eval_expr State.{state with thread} expr
     in thread, value::values in
   let thread, values =
     nsepseq_foldr apply exprs (state.State.thread,[])
@@ -385,166 +511,12 @@ and eval_let_expr state = function
 | LetRecIn (_,_,bindings,_,expr) ->
     eval_expr (eval_let_rec_bindings state bindings) expr
 
-and eval_cat_expr state = function
-  Cat (reg,(arg1,_,arg2)) ->
-    let thread, v1 = eval_cons_expr state arg1 in
-    let thread, v2 = eval_cat_expr  State.{state with thread} arg2 in
-    (match v1, v2 with
-      Value.Str (_,s1), Value.Str (_,s2) -> thread, Value.Str (reg, s1 ^ s2)
-    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
-| ConsExpr e -> eval_cons_expr state e
-
-and eval_cons_expr state = function
-  DisjExpr e -> eval_disj_expr state e
-| Cons (reg,(head,_,tail)) ->
-    let thread, v2 = eval_cons_expr state tail in
-    let thread, v1 = eval_disj_expr State.{state with thread} head in
-    match v2 with
-      Value.List (_,l2) -> thread, Value.List (reg, v1::l2)
-    | _ -> raise (Type_error (State.{state with thread}, __LOC__))
-
-and eval_disj_expr state = function
-  ConjExpr e -> eval_conj_expr state e
-| Or (reg,(e1,_,e2)) ->
-    let thread, v1 = eval_disj_expr state e1 in
-    let thread, v2 = eval_conj_expr State.{state with thread} e2 in
-    let open Value in
-    match v1, v2 with
-      Bool (_,b1), Bool (_,b2) -> thread, Bool (reg, b1 || b2)
-    | _ -> raise (Type_error (State.{state with thread}, __LOC__))
-
-and eval_conj_expr state = function
-  CompExpr e -> eval_comp_expr state e
-| And (reg,(e1,_,e2)) ->
-    let thread, v1 = eval_conj_expr state e1 in
-    let thread, v2 = eval_comp_expr State.{state with thread} e2 in
-    let open Value in
-    match v1, v2 with
-      Bool (_,b1), Bool (_,b2) -> thread, Bool (reg, b1 &&b2)
-    | _ -> raise (Type_error (State.{state with thread}, __LOC__))
-
-and eval_comp_expr state = function
-  Lt (reg,(e1,_,e2)) ->
-    let thread, v1 = eval_comp_expr state e1 in
-    let thread, v2 = eval_add_expr State.{state with thread} e2 in
-    thread,
-    Value.Bool (reg,
-          match v1, v2 with
-            Value.Int (_,z1), Value.Int (_,z2) -> Z.lt z1 z2
-          | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
-
-| LEq (reg,(e1,_,e2)) ->
-    let thread, v1 = eval_comp_expr state e1 in
-    let thread, v2 = eval_add_expr State.{state with thread} e2 in
-    thread,
-    Value.Bool (reg,
-          match v1, v2 with
-            Value.Int (_,z1), Value.Int (_,z2) -> Z.leq z1 z2
-          | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
-
-| Gt (reg,(e1,_,e2)) ->
-    let thread, v1 = eval_comp_expr state e1 in
-    let thread, v2 = eval_add_expr State.{state with thread} e2 in
-    thread,
-    Value.Bool (reg,
-          match v1, v2 with
-            Value.Int (_,z1), Value.Int (_,z2) -> Z.gt z1 z2
-          | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
-
-| GEq (reg,(e1,_,e2)) ->
-    let thread, v1 = eval_comp_expr state e1 in
-    let thread, v2 = eval_add_expr State.{state with thread} e2 in
-    thread,
-    Value.Bool (reg,
-          match v1, v2 with
-            Value.Int (_,z1), Value.Int (_,z2) -> Z.geq z1 z2
-          | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
-
-| NEq (reg,(e1,_,e2)) ->
-    let thread, v1 = eval_comp_expr state e1 in
-    let thread, v2 = eval_add_expr State.{state with thread} e2
-    in thread, Value.(Bool (reg, not (eq thread v1 v2)))
-
-| Eq (reg,(e1,_,e2)) ->
-    let thread, v1 = eval_comp_expr state e1 in
-    let thread, v2 = eval_add_expr State.{state with thread} e2
-    in thread, Value.(Bool (reg, eq thread v1 v2))
-
-| AddExpr e -> eval_add_expr state e
-
-and eval_add_expr state = function
-  Add (reg,(e1,_,e2)) ->
-    let thread, v1 = eval_add_expr state e1 in
-    let thread, v2 = eval_mult_expr State.{state with thread} e2 in
-    thread,
-    (match v1, v2 with
-       Value.Int (_,z1), Value.Int (_,z2) -> Value.Int (reg, Z.(+) z1 z2)
-    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
-
-| Sub (reg,(e1,_,e2)) ->
-    let thread, v1 = eval_add_expr state e1 in
-    let thread, v2 = eval_mult_expr State.{state with thread} e2 in
-    thread,
-    (match v1, v2 with
-       Value.Int (_,z1), Value.Int (_,z2) -> Value.Int (reg, Z.(-) z1 z2)
-    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
-
-| MultExpr e -> eval_mult_expr state e
-
-and eval_mult_expr state = function
-  Mult (reg,(e1,_,e2)) ->
-    let thread, v1 = eval_mult_expr state e1 in
-    let thread, v2 = eval_unary_expr State.{state with thread} e2 in
-    thread,
-    (match v1, v2 with
-      Value.Int (_,z1), Value.Int (_,z2) -> Value.Int (reg, Z.( * ) z1 z2)
-    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
-
-| Div (reg,(e1,_,e2)) ->
-    let thread, v1 = eval_mult_expr state e1 in
-    let thread, v2 = eval_unary_expr State.{state with thread} e2 in
-    thread,
-    (match v1, v2 with
-      Value.Int (_,z1), Value.Int (_,z2) ->
-        if Z.equal z2 Z.zero then
-          raise (Div_by_zero (State.{state with thread},
-                              region_of_unary_expr e2))
-        else Value.Int (reg, Z.(/) z1 z2)
-    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
-
-| Mod (reg,(e1,_,e2)) ->
-    let thread, v1 = eval_mult_expr state e1 in
-    let thread, v2 = eval_unary_expr State.{state with thread} e2 in
-    thread,
-    (match v1, v2 with
-      Value.Int (_,z1), Value.Int (_,z2) -> Value.Int (reg, Z.(mod) z1 z2)
-    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
-
-| UnaryExpr e -> eval_unary_expr state e
-
-and eval_unary_expr state = function
-  Primary e -> eval_primary_expr state e
-| Not (r,(_,e)) ->
-    let thread, v = eval_core_expr state e in
-   (match v with
-      Value.Bool (_,b) -> thread, Value.Bool (r, not b)
-    | _ -> raise (Type_error (State.{state with thread}, __LOC__)))
-| Neg (r,(_,e)) ->
-    let thread, v = eval_core_expr state e in
-    match v with
-      Value.Int (_,z) -> thread, Value.Int (r, Z.neg z)
-    | _ -> raise (Type_error (State.{state with thread}, __LOC__))
-
-and eval_primary_expr state = function
-  CoreExpr e -> eval_core_expr state e
-| CallExpr e -> eval_call_expr state e
-
 (* Note: We evaluate the arguments leftwards, as observed with the
    OCaml compiler (undocumented). *)
 
 and eval_call_expr state (reg,(func,arg)) =
-  let thread, arg_val = eval_core_expr state arg in
-  let thread, fun_val = eval_primary_expr State.{state with thread} func in
+  let thread, arg_val = eval_expr state arg in
+  let thread, fun_val = eval_expr State.{state with thread} func in
   let open Value in
   match fun_val with
     Value.Clos (_, {param; body; env})
@@ -553,18 +525,6 @@ and eval_call_expr state (reg,(func,arg)) =
       let thread, v = eval_expr state body in
       thread, Value.set_region reg v
   | _ -> raise (Type_error (State.{state with thread}, __LOC__))
-
-and eval_core_expr state =
-  let thread = state.State.thread in function
-              Int z -> thread, Value.Int z
-  |           Str s -> thread, Value.Str s
-  |      Unit (r,_) -> thread, Value.Unit r
-  |        True reg -> thread, Value.Bool (reg, true)
-  |       False reg -> thread, Value.Bool (reg, false)
-  |  Var (r,_ as v) -> thread, Value.set_region r (Env.find v state.State.env)
-  | Par (_,(_,e,_)) -> eval_expr state e
-  |          List l -> eval_expr_list state l
-  |        Extern e -> eval_external state e
 
 and eval_external state = function
     Cast e -> eval_cast_expr   state e
@@ -630,7 +590,7 @@ and eval_cast_expr state = function
 
 let add_casts state =
   let param          = "x"
-  and extern cast    = core_to_expr (Extern (Cast cast)) in
+  and extern cast    = Extern (Cast cast) in
   let string_of_int  = extern (StringOfInt param)
   and string_of_bool = extern (StringOfBool param) in
   let mk_clos body =
@@ -642,7 +602,7 @@ let add_casts state =
 
 let add_prints state =
   let param        = "x"
-  and extern print = core_to_expr (Extern (Print print)) in
+  and extern print = Extern (Print print) in
   let print_string = extern (PrintString param)
   and print_int    = extern (PrintInt param) in
   let mk_clos body =
@@ -654,7 +614,7 @@ let add_prints state =
 
 let add_scanf state =
   let param        = "x"
-  and extern scanf = core_to_expr (Extern (Scanf scanf)) in
+  and extern scanf = Extern (Scanf scanf) in
   let scanf_int    = extern (ScanfInt param)
   and scanf_string = extern (ScanfString param)
   and scanf_bool   = extern (ScanfBool param) in
@@ -669,7 +629,7 @@ let add_scanf state =
 let add_equal state =
   let ghost_fun = ghost and ghost_arrow = ghost in
   let equal = Fun (ghost, (ghost_fun, (ghost, "y"), ghost_arrow,
-                           core_to_expr (Extern (PolyEq ("x","y"))))) in
+                           Extern (PolyEq ("x","y")))) in
   let closure =
     Value.(Clos (ghost, {param=ghost,"x"; body=equal; env=Env.empty})) in
   let env = Env.add (ghost, "equal") closure state.State.env

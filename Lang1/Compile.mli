@@ -61,16 +61,4 @@ val get_edit  : filter -> TEdit.filter
 
 (* Edition of the main file *)
 
-val add_functor : editor
 val edit_ast    : debug:Utils.String.Set.t -> AST.t -> editor
-
-(* Edition of the runtime environment (RTE) *)
-
-(*val add_out_channels: editor*)
-val add_error_printing: editor
-val add_functor_call: (*bv:AST.Vars.t -> pretty:bool -> labels:bool ->*) editor
-val add_end: editor
-
-(* Generating the runtime exception handlers *)
-
-val add_error_handling : editor

@@ -43,24 +43,15 @@ open AST
 %inline oreg(X):
   X { Region.make ~start:$symbolstartpos ~stop:$endpos }
 
-(* Keywords in common with OCaml *)
+(* Keywords, symbols, literals and virtual tokens *)
 
-let kwd(X) == ~=oreg(X); <>
-
-(* Symbols *)
-
-let sym(X) == ~=oreg(X); <>
-
-(* Literals *)
-
+let kwd(X) == ~=oreg(X);    <>
+let sym(X) == ~=oreg(X);    <>
 let ident  == ~=reg(Ident); <>
 let string == ~=reg(Str);   <>
+let eof    == ~=oreg(EOF);  <>
 
-(* Virtual tokens *)
-
-let eof == ~=oreg(EOF); <>
-
-(* Compounds *)
+(* Compounded constructs *)
 
 par(X): reg(sym(LPAR) X sym(RPAR) { $1,$2,$3 }) { $1 }
 
@@ -184,11 +175,11 @@ pattern:
 
 expr:
   reg(let_expr)                                                    { LetExpr $1 }
-| cat_expr                                                         { CatExpr $1 }
 | csv(cat_expr)                                                    {   Tuple $1 }
 | reg(conditional)                                                 {      If $1 }
 | fun_expr                                                         {     Fun $1 }
 | reg(match_expr)                                                  {   Match $1 }
+| cat_expr                                                         {         $1 }
 
 match_expr:
   kwd(Match) expr kwd(With) bsv(case) kwd(End)                 { $1,$2,$3,$4,$5 }
@@ -210,56 +201,56 @@ fun_expr:
   }
 
 cat_expr:
-  reg(cons_expr sym(CAT) cat_expr {$1,$2,$3})                    {       Cat $1 }
-| cons_expr                                                      {  ConsExpr $1 }
+  reg(cons_expr sym(CAT) cat_expr {$1,$2,$3})                        {   Cat $1 }
+| cons_expr                                                          {       $1 }
 
 cons_expr:
-  reg(disj_expr sym(CONS) cons_expr {$1,$2,$3})                  {      Cons $1 }
-| disj_expr                                                      {  DisjExpr $1 }
+  reg(disj_expr sym(CONS) cons_expr {$1,$2,$3})                      {  Cons $1 }
+| disj_expr                                                          {       $1 }
 
 disj_expr:
-  reg(disj_expr sym(BOOL_OR) conj_expr {$1,$2,$3})               {        Or $1 }
-| conj_expr                                                      {  ConjExpr $1 }
+  reg(disj_expr sym(BOOL_OR) conj_expr {$1,$2,$3})                   {    Or $1 }
+| conj_expr                                                          {       $1 }
 
 conj_expr:
-  reg(conj_expr sym(BOOL_AND) comp_expr {$1,$2,$3})              {       And $1 }
-| comp_expr                                                      {  CompExpr $1 }
+  reg(conj_expr sym(BOOL_AND) comp_expr {$1,$2,$3})                  {   And $1 }
+| comp_expr                                                          {       $1 }
 
 comp_expr:
-  reg(comp_expr sym(LT) add_expr {$1,$2,$3})                     {        Lt $1 }
-| reg(comp_expr sym(LE) add_expr {$1,$2,$3})                     {       LEq $1 }
-| reg(comp_expr sym(GT) add_expr {$1,$2,$3})                     {        Gt $1 }
-| reg(comp_expr sym(GE) add_expr {$1,$2,$3})                     {       GEq $1 }
-| reg(comp_expr sym(EQ) add_expr {$1,$2,$3})                     {        Eq $1 }
-| reg(comp_expr sym(NE) add_expr {$1,$2,$3})                     {       NEq $1 }
-| add_expr                                                       {   AddExpr $1 }
+  reg(comp_expr sym(LT) add_expr {$1,$2,$3})                         {    Lt $1 }
+| reg(comp_expr sym(LE) add_expr {$1,$2,$3})                         {   LEq $1 }
+| reg(comp_expr sym(GT) add_expr {$1,$2,$3})                         {    Gt $1 }
+| reg(comp_expr sym(GE) add_expr {$1,$2,$3})                         {   GEq $1 }
+| reg(comp_expr sym(EQ) add_expr {$1,$2,$3})                         {    Eq $1 }
+| reg(comp_expr sym(NE) add_expr {$1,$2,$3})                         {   NEq $1 }
+| add_expr                                                           {       $1 }
 
 add_expr:
-  reg(add_expr sym(PLUS)   mult_expr {$1,$2,$3})                 {       Add $1 }
-| reg(add_expr sym(MINUS)  mult_expr {$1,$2,$3})                 {       Sub $1 }
-| mult_expr                                                      {  MultExpr $1 }
+  reg(add_expr sym(PLUS)   mult_expr {$1,$2,$3})                     {   Add $1 }
+| reg(add_expr sym(MINUS)  mult_expr {$1,$2,$3})                     {   Sub $1 }
+| mult_expr                                                          {       $1 }
 
 mult_expr:
-  reg(mult_expr sym(MULT) unary_expr {$1,$2,$3})                 {      Mult $1 }
-| reg(mult_expr sym(DIV)  unary_expr {$1,$2,$3})                 {       Div $1 }
-| reg(mult_expr kwd(Mod)  unary_expr {$1,$2,$3})                 {       Mod $1 }
-| unary_expr                                                     { UnaryExpr $1 }
+  reg(mult_expr sym(MULT) unary_expr {$1,$2,$3})                     {  Mult $1 }
+| reg(mult_expr sym(DIV)  unary_expr {$1,$2,$3})                     {   Div $1 }
+| reg(mult_expr kwd(Mod)  unary_expr {$1,$2,$3})                     {   Mod $1 }
+| unary_expr                                                         {       $1 }
 
 unary_expr:
-  reg(sym(MINUS) core_expr {$1,$2})                              {       Neg $1 }
-| reg(kwd(Not)   core_expr {$1,$2})                              {       Not $1 }
-| primary_expr                                                   {   Primary $1 }
+  reg(sym(MINUS) core_expr {$1,$2})                                  {   Neg $1 }
+| reg(kwd(Not)   core_expr {$1,$2})                                  {   Not $1 }
+| primary_expr                                                       {       $1 }
 
 primary_expr:
-  reg(primary_expr core_expr {$1,$2})                            {  CallExpr $1 }
-| core_expr                                                      {  CoreExpr $1 }
+  reg(primary_expr core_expr {$1,$2})                                {  Call $1 }
+| core_expr                                                          {       $1 }
 
 core_expr:
-  reg(Int)                                                       {       Int $1 }
-| ident                                                          {       Var $1 }
-| string                                                         {       Str $1 }
-| unit                                                           {      Unit $1 }
-| kwd(False)                                                     {     False $1 }
-| kwd(True)                                                      {      True $1 }
-| list__(expr)                                                   {      List $1 }
-| par(expr)                                                      {       Par $1 }
+  reg(Int)                                                           {   Int $1 }
+| ident                                                              {   Var $1 }
+| string                                                             {   Str $1 }
+| unit                                                               {  Unit $1 }
+| kwd(False)                                                         { False $1 }
+| kwd(True)                                                          {  True $1 }
+| list__(expr)                                                       {  List $1 }
+| par(expr)                                                          {   Par $1 }

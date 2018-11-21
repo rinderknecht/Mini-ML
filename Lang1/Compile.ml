@@ -10,7 +10,6 @@ module Trans =
     type trans = t
 
     let compare = compare
-
     let equal = (=)
 
     let to_string = function
@@ -76,8 +75,6 @@ and get_state, get_edit = fst, snd
 
 (* Editing *)
 
-(*let mk_pad reg = String.make (Loc.offset (Region.start_loc reg)) ' '*)
-
 let rec edit_ast ~debug (ast,_) =
   (if   Utils.String.Set.is_empty debug
    then Utils.id
@@ -128,12 +125,36 @@ and edit_expr expr =
   match unparse expr with
    `Let (_,_,e) | `Fun (_,(_,_,e)) | `Idem e ->
      (match e with
-           LetExpr (_,e) -> edit_let_expr    e
-     | Fun (_,(_,_,_,e)) -> edit_expr        e
-     |         CatExpr e -> edit_cat_expr    e
-     |          If (_,c) -> edit_conditional c
-     |       Tuple (_,t) -> edit_components  t
-     |       Match (_,e) -> edit_match       e)
+            LetExpr (_,e)  -> edit_let_expr    e
+     |  Fun (_,(_,_,_,e))  -> edit_expr        e
+     |           If (_,c)  -> edit_conditional c
+     |        Tuple (_,t)  -> edit_components  t
+     |        Match (_,e)  -> edit_match       e
+     |  Cat (_,(e1,_,e2))
+     | Cons (_,(e1,_,e2))
+     |   Or (_,(e1,_,e2))
+     |  And (_,(e1,_,e2))
+     |   Lt (_,(e1,_,e2))
+     |  Gt  (_,(e1,_,e2))
+     |  GEq (_,(e1,_,e2))
+     |   Eq (_,(e1,_,e2))
+     |  NEq (_,(e1,_,e2))
+     |  LEq (_,(e1,_,e2))
+     |  Add (_,(e1,_,e2))
+     |  Sub (_,(e1,_,e2))
+     | Mult (_,(e1,_,e2))
+     |  Div (_,(e1,_,e2))
+     |  Mod (_,(e1,_,e2))
+     |   Call (_,(e1,e2))  -> edit_expr e1 <@ edit_expr e2
+     |      Neg (_,(_,e))
+     |      Not (_,(_,e))  -> edit_expr e
+     | Par (_,(_,e,rpar))  -> edit_expr e <@ copy_to (Region.stop_loc rpar)
+     | List (_,(_,e,rbra)) -> edit_list_expr e <@ copy_to (Region.stop_loc rbra)
+     | Int _ | Var _
+     | Str _ | Unit _
+     | True _ | False _
+     | Extern _            -> region_of_expr e |> Region.stop_loc |> copy_to
+     )
 
 and edit_match (kwd_match, expr, kwd_with, cases, _kwd_end) =
   copy_to (Region.start_loc kwd_match)
@@ -164,57 +185,7 @@ and edit_let_expr expr =
 and edit_conditional (_,cond,_,ifso,_,ifnot) =
   edit_expr cond <@ edit_expr ifso <@ edit_expr ifnot
 
-and edit_components comp = nsepseq_foldr edit_cat_expr comp
-
-and edit_cat_expr = function
-  Cat (_,(e1,_,e2)) -> edit_cons_expr e1 <@ edit_cat_expr e2
-|        ConsExpr e -> edit_cons_expr e
-
-and edit_cons_expr = function
-  Cons (_,(e1,_,e2)) -> edit_disj_expr e1 <@ edit_cons_expr e2
-|         DisjExpr e -> edit_disj_expr e
-
-and edit_disj_expr = function
-  Or (_,(e1,_,e2)) -> edit_disj_expr e1 <@ edit_conj_expr e2
-|       ConjExpr e -> edit_conj_expr e
-
-and edit_conj_expr = function
-  And (_,(e1,_,e2)) -> edit_conj_expr e1 <@ edit_comp_expr e2
-|        CompExpr e -> edit_comp_expr e
-
-and edit_comp_expr = function
-  Lt (_,(e1,_,e2)) | Gt  (_,(e1,_,e2)) | GEq (_,(e1,_,e2))
-| Eq (_,(e1,_,e2)) | NEq (_,(e1,_,e2)) | LEq (_,(e1,_,e2)) ->
-    edit_comp_expr e1 <@ edit_add_expr e2
-| AddExpr e -> edit_add_expr e
-
-and edit_add_expr = function
-  Add (_,(e1,_,e2)) | Sub (_,(e1,_,e2)) ->
-    edit_add_expr e1 <@ edit_mult_expr e2
-| MultExpr e -> edit_mult_expr e
-
-and edit_mult_expr = function
-  Mult (_,(e1,_,e2)) | Div  (_,(e1,_,e2)) | Mod (_,(e1,_,e2)) ->
-    edit_mult_expr e1 <@ edit_unary_expr e2
-| UnaryExpr e -> edit_unary_expr e
-
-and edit_unary_expr = function
-  Neg (_,(_,e)) | Not (_,(_,e)) -> edit_core_expr    e
-|                     Primary e -> edit_primary_expr e
-
-and edit_primary_expr = function
-  CallExpr (_,e) -> edit_call_expr e
-|     CoreExpr e -> edit_core_expr e
-
-and edit_call_expr (func,arg) = edit_primary_expr func <@ edit_core_expr arg
-
-and edit_core_expr = function
-  Par (_,(_,e,rpar)) ->
-    edit_expr e <@ copy_to (Region.stop_loc rpar)
-| List (_,(_,e,rbra)) ->
-    edit_list_expr e <@ copy_to (Region.stop_loc rbra)
-| Int _ | Var _ | Str _ | Unit _ | True _ | False _ | Extern _ as e ->
-    region_of_core_expr e |> Region.stop_loc |> copy_to
+and edit_components comp = nsepseq_foldr edit_expr comp
 
 and edit_list_expr expr filter =
   sepseq_foldr edit_list_item expr filter
@@ -227,18 +198,8 @@ and edit_list_item expr =
   <@ edit_expr expr
   <@ insert ")"
 
-(* Adding the "open Prologue" at the beginning of the OCaml module *)
-
-(* Adding the opening of the functor *)
-
-let add_functor = insert "module Run () = struct\n"
-
-(* Adding the "end" keyword *)
-
-let add_end = skip_to_end <@ insert "end\n"
-
 (* Generating the runtime environment (RTE) *)
-
+(*
 let add_error_printing =
   insert (sprintf
    "(* Error printing *)\n\n\
@@ -253,50 +214,4 @@ let add_error_printing =
     let external_ text =\n\
     %s  Utils.highlight (Printf.sprintf \"External error: %%s\" text); exit 2\n\n"
     "" "" "" "" "" "")
-
-(**)
-
-let add_functor_call filter =
-  let mod_name =
-    get_input filter |> Filename.remove_extension |> String.capitalize_ascii
-  in insert (sprintf
-        "(* Running the application and catching errors *)\n\n\
-         let () =\n\
-         %s  try\n" "")
-   @@ insert (sprintf
-        "%s    let module M = %s.Run () in\n"
-        "" mod_name)
-   @@ insert (sprintf
-       "%s    ()\n\
-        %s  with\n"
-        "" "")
-     filter
-
-let add_error_handling =
-  insert (sprintf
-    "    Net.Multiple_syn Net.{src; lbl; dst} ->\n\
-     %s      Printf.eprintf \"Duplicate synapse %%s \
-                            from %%s (%%s) to %%s (%%s).\\n\"\n\
-     %s        (Label.to_string lbl)\n\
-     %s        (Neuron.get_name src) \
-               (Neuron.get_addr src |> Net.Addr.to_string)\n\
-     %s        (Neuron.get_name dst) \
-               (Neuron.get_addr dst |> Net.Addr.to_string)\n\
-     %s  | Eval.Nameless_input (state, region) ->\n\
-     %s      runtime \"Nameless input neuron.\" region;\n\
-     %s      try_dot state; exit 7\n\
-     %s  | Eval.Nameless_output (state, region) ->\n\
-     %s      runtime \"Nameless output neuron.\" region;\n\
-     %s      try_dot state; exit 7\n\
-     %s  | Eval.Toplevel_state (state, region) ->\n\
-     %s      runtime \"Top-level neuron with an explicit state.\" region;\n\
-     %s      try_dot state; exit 7\n\
-     %s  | Eval.Homograph (state, _, (name_reg, name), addr) ->\n\
-     %s      let msg = Printf.sprintf\n\
-     %s        \"Duplicate neuron named \\\"%%s\\\" in network \\\"%%s\\\"\"\n\
-     %s        name (Network.Net.Addr.to_string addr)\n\
-     %s      in runtime msg name_reg; try_dot state; exit 7\n"
-
-    "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "  " ""
-
-)
+*)
