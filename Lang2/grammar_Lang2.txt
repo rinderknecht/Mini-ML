@@ -1,0 +1,196 @@
+(* Extended Backus-Naur Form (EBNF) for Imperative Mini-ML (IMML)
+
+   This is not a strict subset of OCaml because
+
+     * the "match" construct is closed here with the keyword "end";
+
+     * the components making up the parameters are separated by ";";
+
+     * the syntax for constructed types is prefix.
+
+   Terminal are either excerpts of concrete syntax between double
+   quotes, e.g. ";", or start with a capital letter.
+
+   Non-terminals start with a small letter.
+
+   {non_terminal TERMINAL ...}+ : A non-empty sequence of
+                                  non-terminal separated by a terminal
+
+   {non_terminal TERMINAL ...}* : A possibly empty sequence of
+                                  non-terminals separated by terminal
+
+   non_terminal+                : A non-empty sequence of non-terminals
+
+   non_terminal*                : A possibly empty sequence of non-terminals
+*)
+
+(* Toplevel *)
+
+program ::= statement* EOF
+
+statement ::=
+  "type" Ident "=" type_def
+| "let" let_binding
+
+(* Type declarations *)
+
+type_def ::=
+  type_expr
+| record_decl
+
+record_decl ::= "{" {field_decl ";" ...}+ "}"
+
+field_decl ::= Ident ":" type_expr
+
+type_expr ::=
+  Ident
+| prim_type
+| constr_type
+| {type_expr "*" ...}+
+| "(" type_expr ")"
+
+prim_type ::=
+  "string"
+| "bytes"
+| "bool"
+| "int"
+| "nat"
+| "mutez"
+
+constr_type ::=
+  "list"   domain
+| "option" domain
+| "ref"    domain
+| "map"    domain range
+| "set"    domain range
+
+domain ::=
+  Ident
+| prim_type
+| "(" type_expr ")"
+
+range ::= domain
+
+(* Value declaration *)
+
+let_binding ::=
+  fun_binding
+| non_fun_binding
+
+non_fun_binding ::= Ident ":" type_expr "=" expr
+
+fun_binding ::= Ident parameters ":" type_expr "=" expr
+
+parameters ::= "(" {param_decl ";" ...}* ")"
+
+param_decl ::= Ident ":" type_expr
+
+(* Expressions *)
+
+expr ::= {non_seq_expr ";" ...}+
+
+non_seq_expr ::=
+  let_expr
+| conditional
+| fun_expr
+| match_expr
+| {cat_expr "," ...}+
+| asgnmnt
+
+match_expr ::= "match" expr "with" {case "|" ...}+ "end"
+
+case ::= let_lhs "->" expr
+
+let_expr ::= "let" non_fun_binding "in" expr
+
+conditional ::= "if" expr "then" expr "else" expr
+
+fun_expr ::= "fun" pattern+ "->" expr
+
+cat_expr ::=
+  cons_expr "^" cat_expr
+| cons_expr
+
+cons_expr ::=
+  disj_expr "::" cons_expr
+| disj_expr
+
+disj_expr ::=
+  disj_expr "||" conj_expr
+| conj_expr
+
+conj_expr ::=
+  conj_expr "&&" comp_expr
+| comp_expr
+
+comp_expr ::=
+  comp_expr "<"  add_expr
+| comp_expr "<=" add_expr
+| comp_expr ">"  add_expr
+| comp_expr ">=" add_expr
+| comp_expr "="  add_expr
+| comp_expr "<>" add_expr
+| add_expr
+
+add_expr ::=
+  add_expr "+" mult_expr
+| add_expr "-" mult_expr
+| mult_expr
+
+mult_expr ::=
+  mult_expr "*"   unary_expr
+| mult_expr "div" unary_expr
+| mult_expr "mod" unary_expr
+| unary_expr
+
+unary_expr ::=
+  "-" core_expr
+| "not" core_expr
+| primary_expr
+
+primary_expr ::=
+  primary_expr core_expr
+| core_expr
+
+core_expr ::=
+  Int
+| Ident
+| String
+| "()"
+| "false"
+| "true"
+| "[" {expr ";" ...}+ "]"
+| "(" expr ")"
+| "begin" expr "end"
+| "[" "]" ":" type_expr
+| "None" ":" type_expr
+
+(* Patterns *)
+
+let_lhs ::=
+  pattern cons cons_pat
+| {pattern "," ...}+
+| common_pattern
+
+common_pattern ::=
+  Ident
+| "_"
+| "()"
+| Int
+| "true"
+| "false"
+| String
+| "[" {cons_pat ";" ...}* "]"
+| "(" ptuple ")"
+
+ptuple ::= {cons_pat "," ...}+
+
+unit ::= "(" ")"
+
+cons_pat ::=
+  pattern "::" cons_pat
+| pattern
+
+pattern ::=
+  "(" cons_pat ")"
+| common_pattern
