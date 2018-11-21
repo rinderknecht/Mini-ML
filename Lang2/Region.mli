@@ -34,28 +34,28 @@ exception Invalid
 
 val make: start:Pos.t -> stop:Pos.t -> t
 
-val ghost: t
+val ghost : t
 
 (* Projections *)
 
-val start_pos: t -> Pos.t
-val stop_pos:  t -> Pos.t
-val start_loc: t -> Loc.t
-val stop_loc:  t -> Loc.t
-val file:      t -> string
+val start_pos : t -> Pos.t
+val stop_pos  : t -> Pos.t
+val start_loc : t -> Loc.t
+val stop_loc  : t -> Loc.t
+val file      : t -> string
 
-val pos:       t -> Pos.t * Pos.t
-val locs:      t -> Loc.t * Loc.t
+val pos       : t -> Pos.t * Pos.t
+val locs      : t -> Loc.t * Loc.t
 
 (* Comparisons *)
 
-val leq: t -> t -> bool
+val leq : t -> t -> bool
 
 (* Predicates *)
 
-val is_ghost: t -> bool
+val is_ghost : t -> bool
 
 (* Conversions to [string] *)
 
-val to_string: ?file:bool -> region -> string
-val compact:   region -> string
+val to_string : ?file:bool -> region -> string
+val compact   : ?offsets:bool -> region -> string

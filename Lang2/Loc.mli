@@ -53,4 +53,4 @@ val is_max : t -> bool
 
 (* Conversion to [string] *)
 
-val to_string : ?emacs:bool -> t -> string
+val to_string : ?offsets:bool -> t -> string
