@@ -66,7 +66,7 @@ module type S =
 
     val init_io : (trans -> string) -> io_map
     val add     : trans -> in_:filename -> out:filename -> io_map -> io_map
-    val show    : ?emacs:bool -> io_map -> edit list -> unit
+    val show    : ?offsets:bool -> io_map -> edit list -> unit
 
     val print_io_map : io_map -> unit
 
@@ -76,7 +76,7 @@ module type S =
 
 
     val build : ?opt:bool -> io_map -> edit list -> desc * edit list
-    val apply : ?emacs:bool -> ?io:io_map -> desc -> edit -> unit
+    val apply : ?offsets:bool -> ?io:io_map -> desc -> edit -> unit
 
     val close_out_desc : io_map -> desc -> unit
   end
@@ -330,18 +330,18 @@ module Make (Trans: Trans) =
 
     (* Pretty-printing of edits (of type [edit]) *)
 
-    let string_of_copy ?(emacs=true) io trans loc =
+    let string_of_copy ?(offsets=true) io trans loc =
       Printf.sprintf "*** Copy up to %s:%s:%s into %s"
         (io.to_string trans)
         (Filename.basename (TransMap.find trans io.input.drop))
-        (Loc.to_string ~emacs loc)
+        (Loc.to_string ~offsets loc)
         (Filename.basename (TransMap.find trans io.output.drop))
 
-    let string_of_skip ?(emacs=true) io trans loc =
+    let string_of_skip ?(offsets=true) io trans loc =
       Printf.sprintf "*** Skip up to %s:%s:%s"
         (io.to_string trans)
         (Filename.basename (TransMap.find trans io.input.drop))
-        (Loc.to_string ~emacs loc)
+        (Loc.to_string ~offsets loc)
 
     let string_of_goto io trans char =
       Printf.sprintf "*** Go to next character %s:%s:'%s'"
@@ -355,28 +355,28 @@ module Make (Trans: Trans) =
         (Filename.basename (TransMap.find trans io.output.drop))
         (if text = "" then "<empty string>" else text)
 
-    let rec string_of_edit ?(emacs=true) io = function
+    let rec string_of_edit ?(offsets=true) io = function
       Null -> "*** Null."
     | Copy (trans,loc,edit) ->
-        string_of_copy ~emacs io trans loc ^ "\n"
-      ^ string_of_edit ~emacs io edit
+        string_of_copy ~offsets io trans loc ^ "\n"
+      ^ string_of_edit ~offsets io edit
     | Skip (trans,loc,edit) ->
-        string_of_skip ~emacs io trans loc ^ "\n"
-      ^ string_of_edit ~emacs io edit
+        string_of_skip ~offsets io trans loc ^ "\n"
+      ^ string_of_edit ~offsets io edit
     | Goto (trans,char,edit) ->
         string_of_goto io trans char ^ "\n"
-      ^ string_of_edit ~emacs io edit
+      ^ string_of_edit ~offsets io edit
     | Write (trans,text,edit) ->
         string_of_write io trans text ^ "\n"
-      ^ string_of_edit ~emacs io edit
+      ^ string_of_edit ~offsets io edit
 
-    let print ?(emacs=true) io edit =
-      print_endline (string_of_edit ~emacs io edit)
+    let print ?(offsets=true) io edit =
+      print_endline (string_of_edit ~offsets io edit)
 
     (* The call [show io edits] prints the edits [edits] interpreted
        with respect to the I/O map [io]. *)
 
-    let show ?(emacs=true) io = List.iter (print ~emacs io)
+    let show ?(offsets=true) io = List.iter (print ~offsets io)
 
     (* Two transformations, [trans1] and [trans2], are considered
        equal by [eq_input] if their corresponding file names are equal. *)
@@ -830,7 +830,7 @@ and scan_until loc action char_stop = parse
      whereas the current character in the input is copied to the
      output.
 
-     The optional parameters [emacs] and [io] are only used for tracing
+     The optional parameters [offsets] and [io] are only used for tracing
      the edit being applied and [io] has to be one used to create
      [desc] (not checked here).
   *)
@@ -842,11 +842,11 @@ and scan_until loc action char_stop = parse
         {desc with in_desc = TransMap.add trans (loc',buffer) desc.in_desc}
       else desc
 
-    let rec apply ?(emacs=true) ?io (desc: desc) edit =
+    let rec apply ?(offsets=true) ?io (desc: desc) edit =
       let nothing _ = ()
       and () = match io with
                  None -> ()
-               | Some io_map -> show ~emacs io_map [edit] in
+               | Some io_map -> show ~offsets io_map [edit] in
       match edit with
         Copy (trans, stop, edit) ->
           let cout = TransMap.find trans desc.out_desc

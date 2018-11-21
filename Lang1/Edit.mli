@@ -209,11 +209,11 @@ module type S =
     val add : trans -> in_:filename -> out:filename -> io_map -> io_map
 
     (* The call [show io edits] prints the edits [edits] interpreted
-       with respect to the I/O map [io]. The optional argument [emacs]
+       with respect to the I/O map [io]. The optional argument [offsets]
        is set to [true] by default, meaning that horizontal offsets,
        rather than column numbers, are used. *)
 
-    val show : ?emacs:bool -> io_map -> edit list -> unit
+    val show : ?offsets:bool -> io_map -> edit list -> unit
 
     (* Pretty-printing of I/O maps (of type [io_map]) *)
 
@@ -282,12 +282,11 @@ module type S =
        in [edits], using the I/O descriptors [desc] to interpret the I/O
        as lexing buffers (for inputs) and channels (for outputs).
 
-       The optional parameters [emacs] and [io] are only used for tracing
-       the edit being applied and [io] has to be one used to create
-       [desc] (not checked here).
-    *)
+       The optional parameters [offsets] and [io] are only used for
+       tracing the edit being applied and [io] has to be one used to
+       create [desc] (not checked here).  *)
 
-    val apply : ?emacs:bool -> ?io:io_map -> desc -> edit -> unit
+    val apply : ?offsets:bool -> ?io:io_map -> desc -> edit -> unit
 
     (* Closing the out-channel descriptors *)
 

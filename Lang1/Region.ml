@@ -51,19 +51,19 @@ let to_string ?(file=true) {start; stop} =
      else Printf.sprintf "%s %i to line %i, char %i"
                          info start_col_pos stop.pos_lnum stop_col_pos
 
-let compact {start; stop} =
-  Printf.sprintf "%s-%s" (Pos.compact start) (Pos.compact stop)
+let anon_pos ?(offsets=true) pos =
+  if pos = Lexing.dummy_pos then "ghost"
+  else Printf.sprintf "%i:%i"
+        (Pos.get_line pos)
+        Pos.((if offsets then get_offset else get_column) pos)
 
-(*
-exception Crossfile of t * t
-
-let merge r1 r2 =
-  if is_ghost r1 then r2
-  else if is_ghost r2 then r1
-  else if r1.start.Pos.pos_fname <> r2.start.Pos.pos_fname
-  then raise (Crossfile (r1, r2))
+let compact ?(offsets=true) {start; stop} =
+  let start_file = Pos.get_file start
+  and stop_file  = Pos.get_file stop in
+  if start_file = stop_file then
+    Printf.sprintf "%s:%s-%s"
+      start_file (anon_pos ~offsets start) (anon_pos ~offsets stop)
   else
-    let start = if r1.start <= r2.start then r1.start else r2.start
-    and stop  = if r1.stop <= r2.stop   then r2.stop  else r2.stop
-    in {start; stop}
-*)
+    Printf.sprintf "%s:%s-%s:%s"
+      start_file (anon_pos ~offsets start)
+      stop_file  (anon_pos ~offsets stop)

@@ -60,5 +60,5 @@ let is_max loc = loc.line = max_int && loc.column = max_int
 
 (* Conversion to [string] *)
 
-let to_string ?(emacs=true) {file; line; column} =
-  Printf.sprintf "%s:%i:%i" file line (if emacs then column - 1 else column)
+let to_string ?(offsets=true) {file; line; column} =
+  Printf.sprintf "%s:%i:%i" file line (if offsets then column - 1 else column)
