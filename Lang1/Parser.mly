@@ -73,16 +73,16 @@ bracket(X): sym(LBRACK) X sym(RBRACK) { $1,$2,$3 }
    rules.
 *)
 
-(* Non-empty sequence of items *)
-
-nseq(X):
-  X seq(X) { $1,$2 }
-
 (* Possibly empty sequence of items *)
 
 seq(X):
   (**)     {     [] }
 | X seq(X) { $1::$2 }
+
+(* Non-empty sequence of items *)
+
+nseq(X):
+  X seq(X) { $1,$2 }
 
 (* Non-empty separated sequence of items *)
 

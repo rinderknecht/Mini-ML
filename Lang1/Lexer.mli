@@ -32,15 +32,15 @@ exception Error of diagnostic
 
 type logger = out_channel * (out_channel -> Token.t -> unit)
 
-val get_token: ?log:logger -> Lexing.lexbuf -> Token.t
-val reset:     file:string -> ?line:int -> Lexing.lexbuf -> unit
+val get_token : ?log:logger -> Lexing.lexbuf -> Token.t
+val reset     : file:string -> ?line:int -> Lexing.lexbuf -> unit
 
 (* Debugging *)
 
-val trace:           filename -> unit
-val prerr:           kind:string -> diagnostic -> unit
-val error_to_string: kind:string -> message -> Region.t -> string
-val output_token:    Lexing.lexbuf -> out_channel -> Token.t -> unit
+val trace        : filename -> unit
+val prerr        : kind:string -> diagnostic -> unit
+val format_error : kind:string -> message -> Region.t -> string
+val output_token : Lexing.lexbuf -> out_channel -> Token.t -> unit
 
 (* Hack to roll back one lexeme in Ocamllex buffer (should be safe if
    used in the semantic actions of the regular expression recognising

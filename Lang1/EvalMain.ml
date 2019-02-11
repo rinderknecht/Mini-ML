@@ -11,11 +11,11 @@ open! EvalOpt (* Reads the command-line options: Effectful! *)
 let () = Printexc.record_backtrace true
 
 let runtime text region =
-  let msg = Lexer.error_to_string ~kind:"\nRuntime" text region
+  let msg = Lexer.format_error ~kind:"\nRuntime" text region
   in Utils.highlight msg
 
 let static text region =
-  let msg = Lexer.error_to_string ~kind:"\nStatic" text region
+  let msg = Lexer.format_error ~kind:"\nStatic" text region
   in Utils.highlight msg
 
 let internal text =

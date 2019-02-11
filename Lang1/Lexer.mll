@@ -240,12 +240,12 @@ let get_token ?log =
 
 (* Standalone lexer for debugging purposes *)
 
-let error_to_string ~(kind: string) msg region =
+let format_error ~(kind: string) msg region =
   Printf.sprintf "%s error in %s:\n%s%!"
     kind (Region.to_string region) msg
 
 let prerr ~(kind: string) (msg, region) =
-  highlight (error_to_string ~kind msg region)
+  highlight (format_error ~kind msg region)
 
 type filename = string
 

@@ -1,12 +1,5 @@
 (* Abstract Syntax Tree (AST) for Mini-ML *)
 
-(* The AST is stratified in such a way that it is (almost) isomorphic
-   to the grammar (see module [Parser]. This enables to write
-   straightforward semantic actions in the parser, at the cost of
-   deeper abstract trees being built (for example, arithmetic
-   operators are binary). In order to ease the matching on those
-   trees, some specific functions are provided here. *)
-
 open Utils
 
 (* Regions
