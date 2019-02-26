@@ -14,13 +14,13 @@ let help () =
   print_endline "where <input>.mml is the Mini-ML source file (default: stdin),";
   print_endline "and each <option> (if any) is one of the following:";
   print_endline "  -I <paths>         Library paths (colon-separated)";
-  print_endline "  -c [<file>.ml]     Translate to OCaml in <file>.ml or stdout (<input>.mml required)";
+  print_endline "  -c [<file>.ml]     Translate to OCaml in <file>.ml";
+  print_endline "                     (default: <input>.ml)";
   print_endline "  -e, --eval         Interpret <input>.mml or stdin";
   print_endline "  --raw-edits        Do not optimise translation edits";
-  print_endline "  --verbose=<phase>  Colon-separated phases: cmdline, lexer,";
+  print_endline "  --verbose=<phases> Colon-separated phases: cmdline, lexer,";
   print_endline "                     parser, unparsing, norm, eval";
-  print_endline "  --version          Print the version number on \
-                                      stdout and exit";
+  print_endline "  --version          Short commit hash on stdout";
   print_endline "  -h, --help         This help";
   exit 0
 
@@ -46,8 +46,8 @@ let add_path p = libs := !libs @ split_at_colon p
 
 let add_verbose d =
   verbose := List.fold_left (Utils.swap Utils.String.Set.add)
-                         !verbose
-                         (split_at_colon d)
+                            !verbose
+                            (split_at_colon d)
 
 let specs =
   let open! Getopt in [
@@ -58,7 +58,7 @@ let specs =
     noshort, "raw-edits", set raw_edits true, None;
     noshort, "verbose",   None, Some add_verbose;
     'h',     "help",      Some help, None;
-    'v',     "version",   Some version, None;
+    noshort, "version",   Some version, None
   ]
 ;;
 
@@ -122,7 +122,7 @@ let compile =
   | Some "" ->
      (match input with
         None | Some "-" -> abort "The target OCaml filename is missing."
-      | Some file -> Some (Filename.remove_extension file ^ ".mml"))
+      | Some file -> Some (Filename.remove_extension file ^ ".ml"))
   | Some compile' ->
       if   Filename.check_suffix compile' ".ml"
       then !compile
@@ -139,10 +139,10 @@ let () =
   if Utils.String.Set.mem "cmdline" verbose then
     begin
       printf "\nEXPORTED COMMAND LINE\n";
-      printf "input     = \"%s\"\n" (string_of quote input);
-      printf "compile   = %s\n"     (string_of quote compile);
-      printf "eval      = %B\n"     eval;
-      printf "raw_edits = %B\n"     raw_edits;
-      printf "verbose   = %s\n"     verb_str;
-      printf "I         = %s\n"     (string_of_path libs)
+      printf "input     = %s\n" (string_of quote input);
+      printf "compile   = %s\n" (string_of quote compile);
+      printf "eval      = %B\n" eval;
+      printf "raw_edits = %B\n" raw_edits;
+      printf "verbose   = %s\n" verb_str;
+      printf "I         = %s\n" (string_of_path libs)
     end
