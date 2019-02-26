@@ -78,7 +78,7 @@ expr ::=
 | conditional
 | fun_expr
 | match_expr
-| {cat_expr "," ...}+
+| {disj_expr "," ...}+
 
 match_expr ::=
   "match" expr "with" {case "|" ...}+ "end"
@@ -94,14 +94,6 @@ conditional ::= "if" expr "then" expr "else" expr
 
 fun_expr ::= "fun" pattern+ "->" expr
 
-cat_expr ::=
-  cons_expr "^" cat_expr
-| cons_expr
-
-cons_expr ::=
-  disj_expr "::" cons_expr
-| disj_expr
-
 disj_expr ::=
   disj_expr "||" conj_expr
 | conj_expr
@@ -111,12 +103,20 @@ conj_expr ::=
 | comp_expr
 
 comp_expr ::=
-  comp_expr "<"  add_expr
-| comp_expr "<=" add_expr
-| comp_expr ">"  add_expr
-| comp_expr ">=" add_expr
-| comp_expr "="  add_expr
-| comp_expr "<>" add_expr
+  comp_expr "<"  cat_expr
+| comp_expr "<=" cat_expr
+| comp_expr ">"  cat_expr
+| comp_expr ">=" cat_expr
+| comp_expr "="  cat_expr
+| comp_expr "<>" cat_expr
+| cat_expr
+
+cat_expr ::=
+  cons_expr "^" cat_expr
+| cons_expr
+
+cons_expr ::=
+  add_expr "::" cons_expr
 | add_expr
 
 add_expr ::=

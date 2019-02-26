@@ -75,8 +75,8 @@ and get_state, get_edit = fst, snd
 
 (* Editing *)
 
-let rec edit_ast ~debug (ast,_) =
-  (if   Utils.String.Set.is_empty debug
+let rec edit_ast ~verb (ast,_) =
+  (if   Utils.String.Set.is_empty verb
    then Utils.id
    else insert "let () = Printexc.record_backtrace true\n")
 <@ edit_statements ast

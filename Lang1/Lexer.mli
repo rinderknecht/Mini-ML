@@ -1,11 +1,10 @@
 (* Simple lexer for the Mini-ML language *)
 
-type filename = string
-
 (* Error reporting *)
 
+type 'a reg = 'a * Region.t
 type message = string
-type diagnostic = message * Region.t
+type diagnostic = message reg
 
 exception Error of diagnostic
 
@@ -37,14 +36,9 @@ val reset     : file:string -> ?line:int -> Lexing.lexbuf -> unit
 
 (* Debugging *)
 
-val trace        : filename -> unit
-val prerr        : kind:string -> diagnostic -> unit
-val format_error : kind:string -> message -> Region.t -> string
-val output_token : Lexing.lexbuf -> out_channel -> Token.t -> unit
+type file_path = string
 
-(* Hack to roll back one lexeme in Ocamllex buffer (should be safe if
-   used in the semantic actions of the regular expression recognising
-   the lexeme rolled back. *)
-(*
-val rollback: Lexing.lexbuf -> unit
-*)
+val trace        : file_path option -> unit
+val prerr        : kind:string -> diagnostic -> unit
+val format_error : kind:string -> message reg -> string
+val output_token : Lexing.lexbuf -> out_channel -> Token.t -> unit

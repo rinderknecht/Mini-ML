@@ -175,11 +175,11 @@ pattern:
 
 expr:
   reg(let_expr)                                                    { LetExpr $1 }
-| csv(cat_expr)                                                    {   Tuple $1 }
+| csv(disj_expr)                                                   {   Tuple $1 }
 | reg(conditional)                                                 {      If $1 }
 | fun_expr                                                         {     Fun $1 }
 | reg(match_expr)                                                  {   Match $1 }
-| cat_expr                                                         {         $1 }
+| disj_expr                                                        {         $1 }
 
 match_expr:
   kwd(Match) expr kwd(With) bsv(case) kwd(End)                 { $1,$2,$3,$4,$5 }
@@ -200,14 +200,6 @@ fun_expr:
     in norm ~reg:(reg, kwd_fun) patterns arrow expr
   }
 
-cat_expr:
-  reg(cons_expr sym(CAT) cat_expr {$1,$2,$3})                        {   Cat $1 }
-| cons_expr                                                          {       $1 }
-
-cons_expr:
-  reg(disj_expr sym(CONS) cons_expr {$1,$2,$3})                      {  Cons $1 }
-| disj_expr                                                          {       $1 }
-
 disj_expr:
   reg(disj_expr sym(BOOL_OR) conj_expr {$1,$2,$3})                   {    Or $1 }
 | conj_expr                                                          {       $1 }
@@ -217,12 +209,20 @@ conj_expr:
 | comp_expr                                                          {       $1 }
 
 comp_expr:
-  reg(comp_expr sym(LT) add_expr {$1,$2,$3})                         {    Lt $1 }
-| reg(comp_expr sym(LE) add_expr {$1,$2,$3})                         {   LEq $1 }
-| reg(comp_expr sym(GT) add_expr {$1,$2,$3})                         {    Gt $1 }
-| reg(comp_expr sym(GE) add_expr {$1,$2,$3})                         {   GEq $1 }
-| reg(comp_expr sym(EQ) add_expr {$1,$2,$3})                         {    Eq $1 }
-| reg(comp_expr sym(NE) add_expr {$1,$2,$3})                         {   NEq $1 }
+  reg(comp_expr sym(LT) cat_expr {$1,$2,$3})                         {    Lt $1 }
+| reg(comp_expr sym(LE) cat_expr {$1,$2,$3})                         {   LEq $1 }
+| reg(comp_expr sym(GT) cat_expr {$1,$2,$3})                         {    Gt $1 }
+| reg(comp_expr sym(GE) cat_expr {$1,$2,$3})                         {   GEq $1 }
+| reg(comp_expr sym(EQ) cat_expr {$1,$2,$3})                         {    Eq $1 }
+| reg(comp_expr sym(NE) cat_expr {$1,$2,$3})                         {   NEq $1 }
+| cat_expr                                                           {       $1 }
+
+cat_expr:
+  reg(cons_expr sym(CAT) cat_expr {$1,$2,$3})                        {   Cat $1 }
+| cons_expr                                                          {       $1 }
+
+cons_expr:
+  reg(add_expr sym(CONS) cons_expr {$1,$2,$3})                       {  Cons $1 }
 | add_expr                                                           {       $1 }
 
 add_expr:

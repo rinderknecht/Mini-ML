@@ -125,9 +125,7 @@ end
 (* State *)
 
 and State : sig
-  type thread = {
-    out: out_channel option
-  }
+  type thread = < >
   type t = {env: Env.t; thread: thread}
   type state = t
 end = State
@@ -147,12 +145,11 @@ exception Div_by_zero of State.t * Region.t
 
 (* The evaluation of top-level bindings (called statements below) is
    slightly different from other constructs as the evaluator state
-   must be threaded in stead of only the proper thread (the tree of
-   networks traversed by a zipper). The reason is that the evaluation
-   of a statement enriches the environment and that extended
-   environment must then be used to evaluate the next statement,
-   whereas in the case of subexpressions or local bindings, the
-   environment only flows top-down (that is, local bindings cannot
+   must be threaded in stead of only the proper thread. The reason is
+   that the evaluation of a statement enriches the environment and
+   that extended environment must then be used to evaluate the next
+   statement, whereas in the case of subexpressions or local bindings,
+   the environment only flows top-down (that is, local bindings cannot
    escape). *)
 
 let rec eval_statements state (statements, _) =
@@ -641,14 +638,13 @@ let add_prelude = add_casts <@ add_prints <@ add_scanf <@ add_equal
 (* Main entry
 
    The main function exported by this module is [eval]. First, the
-   initial state is built (if no evaluation environment is provided,
-   the prelude is added --- see above). Then the statements in the AST
-   are evaluated in sequence, and the zipper of the final state is
-   made to apply to the whole network tree (using [Zipper.zip_up]).
-*)
+   initial state is built. Note that we do not have a use here for the
+   thread, but we keep for future developments. If no evaluation
+   environment is provided, the prelude is added. Then the statements
+   in the AST are evaluated in sequence.  *)
 
-let eval ?out =
-  let state = State.{env=Env.empty; thread = {out}} in
+let eval =
+  let state = State.{env=Env.empty; thread = object end} in
   fun ?env ast ->
     let state =
       match env with

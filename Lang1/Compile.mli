@@ -61,4 +61,4 @@ val get_edit  : filter -> TEdit.filter
 
 (* Edition of the main file *)
 
-val edit_ast    : debug:Utils.String.Set.t -> AST.t -> editor
+val edit_ast    : verb:Utils.String.Set.t -> AST.t -> editor

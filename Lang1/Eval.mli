@@ -10,23 +10,24 @@
    _state_.
 
    A state of the interpreter is a pair made of a _value environment_
-   and a _thread_. The environment is a map from variables to values and
-   these variables define the current scope at any point in the program
-   (equivalently, the scope could be defined as the region of the AST
-   containing all the bindings available at a given node); the thread is
-   the information that flows through all the constructs of a program,
-   along the control flow. Contrary to the thread, the value environment
-   only flows downwards in the AST (that is, only those declarations, or
-   bindings, "up in the tree" are visible at any time). The thread could
-   be used to model side-effects of Mini-ML, but it currently only
-   contain the output channel ---As for the analogy: when sewing a piece
-   of clothing, a thread is plucked before being threaded down.
+   and a _thread_. The environment is a map from variables to values
+   and these variables define the current scope at any point in the
+   program (equivalently, the scope could be defined as the region of
+   the AST containing all the bindings available at a given node); the
+   thread is the information that flows through all the constructs of
+   a program, along the control flow. Contrary to the thread, the
+   value environment only flows downwards in the AST (that is, only
+   those declarations, or bindings, "up in the tree" are visible at
+   any time). The thread could be used to model side-effects of
+   Mini-ML, but it is currently empty (an empty object type). As for
+   the analogy: when sewing a piece of clothing, a thread is plucked
+   before being threaded down.
 
-   In general, the effect of each statement in the source file impacts
-   both the environment (by adding a new binding, perhaps also shadowing
-   an existing one) and the thread (by adding a new neuron to the current
-   network, creating a new sub-network or fusing two neurons), hence the
-   return type of [eval] is [State.t], as indicated above.
+   In general, the effect of each statement and expression in the
+   source file impacts both the environment (by adding a new binding,
+   perhaps also shadowing an existing one) and the thread (e.g., if
+   side-effects are added to the language), hence the return type of
+   [eval] is [State.t], as indicated above.
 
    Environments, values (sometimes called _semantic values_, to
    distinguish them from the syntactic values found in the AST) and
@@ -75,10 +76,8 @@
    the [Map] module, specialised to the strings and value.s
 
    Finally, the module [State] defines the type [t] for states as a
-   record containing an environment and a thread. The thread is only made
-   of a zipper, as creating neurons and networks are the only side
-   effects and the zipper interprets them.
-*)
+   record containing an environment and a thread.
+ *)
 
 open Utils
 open AST
@@ -123,9 +122,7 @@ end
 (* State *)
 
 and State : sig
-  type thread = {
-    out: out_channel option
-  }
+  type thread = < >
   type t = {env: Env.t; thread: thread}
   type state = t
 end
@@ -169,12 +166,11 @@ exception Div_by_zero of State.t * Region.t
 
 (* Evaluation *)
 
-(* The Mini-ML interpreter is called by [eval ~out ~env ast], [out]
-   the output channel, [env] the initial environment (see above) and
-   [ast] the Abstract Syntax Tree of the Mini-ML program to be
-   evaluated. *)
+(* The Mini-ML interpreter is called by [eval ~env ast], where [env]
+   is the initial environment (see above) and [ast] the Abstract
+   Syntax Tree of the Mini-ML program to be evaluated. *)
 
-val eval : ?out:out_channel -> ?env:Env.t -> AST.t -> State.t
+val eval : ?env:Env.t -> AST.t -> State.t
 
 (* The function [eval_statements] evaluates an AST in a given state
    into a new state. *)

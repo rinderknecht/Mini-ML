@@ -1,13 +1,8 @@
-(* Pilot for the parser of Mini-ML *)
-
-open! EvalOpt (* Reads the command-line options: Effectful! *)
+(* Driver for the parser of Mini-ML *)
 
 (* Error printing and exception tracing *)
 
-let () = Printexc.record_backtrace true
-
-let external_ text =
-  Utils.highlight (Printf.sprintf "External error: %s" text); exit 1;;
+Printexc.record_backtrace true;;
 
 (* Path to the Mini-ML standard library *)
 
@@ -19,27 +14,25 @@ let lib_path =
 
 (* Opening the input channel and setting the lexing engine *)
 
-let basename = Filename.basename EvalOpt.input
+let cin, reset =
+  match EvalOpt.input with
+    None | Some "-" -> stdin, fun ?(line=1) _buffer -> ignore line
+  |       Some file -> open_in file, Lexer.reset ~file
 
-let prefix =
-  if EvalOpt.input = "-" then "temp"
-  else Filename.remove_extension basename
-
-let cin = open_in EvalOpt.input
 let buffer = Lexing.from_channel cin
-let () = Lexer.reset ~file:basename buffer
+let     () = reset buffer
 
 (* Tokeniser *)
 
 let tokeniser =
-  if Utils.String.Set.mem "lexer" EvalOpt.debug then
+  if Utils.String.Set.mem "lexer" EvalOpt.verbose then
     Lexer.get_token ~log:(stdout, Lexer.output_token buffer)
   else Lexer.get_token ?log:None
 
 let () =
   try
     let ast = Parser.program tokeniser buffer in
-    if Utils.String.Set.mem "unparsing" EvalOpt.debug then
+    if Utils.String.Set.mem "unparsing" EvalOpt.verbose then
       AST.print_tokens ~undo:true ast
     else AST.print_tokens ast
   with

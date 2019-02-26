@@ -324,12 +324,12 @@ type unparsed = [
 | `Idem of expr
 ]
 
-val unparse: expr -> unparsed
+val unparse : expr -> unparsed
 
 (* Conversions to type [string] *)
 
-val to_string:         t -> string
-val pattern_to_string: pattern -> string
+val to_string         :       t -> string
+val pattern_to_string : pattern -> string
 
 (* Printing the tokens reconstructed from the AST. This is very useful
    for debugging, as the output of [print_token ast] can be textually
@@ -348,7 +348,7 @@ val region_of_expr    : expr -> Region.t
 
 (* Removing all outermost parentheses from a given expression *)
 
-val rm_par: expr -> expr
+val rm_par  : expr -> expr
 
 (* Predicates on expressions *)
 
@@ -374,7 +374,7 @@ module FreeVars: Set.S with type elt = rvar
    unbound variable is caught before the translation (where it would
    be wrongly captured by the OCaml compiler).
 
-   Dually, computing bound variables is useful when compiling to
+    Dually, computing bound variables is useful when compiling to
    OCaml.
 *)
 

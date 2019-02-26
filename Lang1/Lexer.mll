@@ -7,8 +7,9 @@ open! Utils
 
 (* Lexical errors *)
 
+type 'a reg = 'a * Region.t
 type message = string
-type diagnostic = message * Region.t
+type diagnostic = message reg
 
 exception Error of diagnostic
 
@@ -16,7 +17,7 @@ let error lexbuf msg =
   let start  = Lexing.lexeme_start_p lexbuf
   and stop   = Lexing.lexeme_end_p   lexbuf in
   let region = Region.make ~start ~stop
-  in raise (Error (msg,region))
+  in raise (Error (msg, region))
 
 (* Keywords *)
 
@@ -240,14 +241,14 @@ let get_token ?log =
 
 (* Standalone lexer for debugging purposes *)
 
-let format_error ~(kind: string) msg region =
+let format_error ~(kind: string) (msg, region) =
   Printf.sprintf "%s error in %s:\n%s%!"
     kind (Region.to_string region) msg
 
-let prerr ~(kind: string) (msg, region) =
-  highlight (format_error ~kind msg region)
+let prerr ~(kind: string) msg =
+  highlight (format_error ~kind msg)
 
-type filename = string
+type file_path = string
 
 let output_token buffer chan token =
   let open Lexing in
@@ -257,9 +258,12 @@ let output_token buffer chan token =
   in Printf.fprintf chan "%s-%s: %s\n%!"
        (Pos.compact start_pos) (Pos.compact curr_pos) conc
 
-let trace file =
+let trace file_opt =
   try
-    let cin = open_in file in
+    let cin, reset =
+      match file_opt with
+        None | Some "-" -> stdin, fun ?(line=1) _buffer -> ignore line
+      |       Some file -> open_in file, reset ~file in
     let buffer = Lexing.from_channel cin in
     let rec iter () =
       try
@@ -268,7 +272,7 @@ let trace file =
         if t = Token.EOF then (close_in cin; close_out stdout) else iter ()
       with Error diag ->
              close_in cin; close_out stdout; prerr ~kind:"Lexical" diag
-    in reset ~file buffer; iter ()
+    in reset buffer; iter ()
   with Sys_error msg -> highlight msg
 
 (* END TRAILER *)
