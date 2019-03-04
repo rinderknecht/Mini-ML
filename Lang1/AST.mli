@@ -193,10 +193,10 @@ and fun_expr = (kwd_fun * var reg * arrow * expr) reg
 and conditional = kwd_if * expr * kwd_then * expr * kwd_else * expr
 
 and extern =
-  Cast     of cast_expr
-| Print    of print_expr
-| Scanf    of scanf_expr
-| PolyEq   of (var * var)                             (* polymorphic equality *)
+  Cast   of cast_expr
+| Print  of print_expr
+| Scanf  of scanf_expr
+| PolyEq of (var * var)                             (* polymorphic equality *)
 
 and cast_expr =
   StringOfInt  of var                                     (* string_of_int  x *)

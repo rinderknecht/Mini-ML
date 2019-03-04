@@ -13,15 +13,15 @@ let help () =
   printf "Usage: %s [<option> ...] [<input>.mml | \"-\"]\n" file;
   print_endline "where <input>.mml is the Mini-ML source file (default: stdin),";
   print_endline "and each <option> (if any) is one of the following:";
-  print_endline "  -I <paths>         Library paths (colon-separated)";
-  print_endline "  -c [<file>.ml]     Translate to OCaml in <file>.ml";
-  print_endline "                     (default: <input>.ml)";
-  print_endline "  -e, --eval         Interpret <input>.mml or stdin";
-  print_endline "  --raw-edits        Do not optimise translation edits";
-  print_endline "  --verbose=<phases> Colon-separated phases: cmdline, lexer,";
-  print_endline "                     parser, unparsing, norm, eval";
-  print_endline "  --version          Short commit hash on stdout";
-  print_endline "  -h, --help         This help";
+  print_endline "  -I <paths>             Library paths (colon-separated)";
+  print_endline "  -c [<file>.ml]         Translate to OCaml in <file>.ml";
+  print_endline "                         (default: <input>.ml)";
+  print_endline "  -e, --eval             Interpret <input>.mml or stdin";
+  print_endline "      --raw-edits        Do not optimise translation edits";
+  print_endline "      --verbose=<phases> Colon-separated phases: cmdline, lexer,";
+  print_endline "                         parser, unparsing, norm, eval";
+  print_endline "      --version          Short commit hash on stdout";
+  print_endline "  -h, --help             This help";
   exit 0
 
 (* Version *)

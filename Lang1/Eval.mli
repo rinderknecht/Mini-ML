@@ -116,7 +116,7 @@ and Value: sig
   val eq         : State.thread -> t -> t -> bool
   val to_string  : t -> string
   val to_region  : t -> Region.t
-  val set_region : Region.t -> t -> t   (* Patching are region *)
+  val set_region : Region.t -> t -> t   (* Patching a region *)
 end
 
 (* State *)

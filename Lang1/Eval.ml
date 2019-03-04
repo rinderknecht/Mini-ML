@@ -156,8 +156,8 @@ let rec eval_statements state (statements, _) =
   List.fold_left eval_statement state statements
 
 and eval_statement state = function
-  Let     (_,(_,  bindings)) -> eval_let_bindings     state bindings
-| LetRec  (_,(_,_,bindings)) -> eval_let_rec_bindings state bindings
+  Let    (_,(_,  bindings)) -> eval_let_bindings     state bindings
+| LetRec (_,(_,_,bindings)) -> eval_let_rec_bindings state bindings
 
 (* To evaluate (possibly parallel) let-bindings, we first project the
    current environment [env] and the bindings are evaluated within
@@ -250,13 +250,10 @@ and filter state pat_env patterns values =
      A restriction on the syntax of left-hand sides and right-hand
    sides is strong enough to address this issue: we let the only valid
    left-hand sides to be variables and the right-hand sides to be
-   either lambdas (that is, anonymous functions) or immediate node
-   creations (that is, starting with the "node" keyword). This is a
-   strong criterion, because "let rec x = 1 and y = x" is rejected,
-   but it is acceptable in practice. In short, the only valid forms
-   are:
+   lambdas, that is, anonymous functions. This is a strong criterion,
+   because "let rec x = 1 and y = x" is rejected, even though it would
+   be meaningful. In short, the only valid form is
 
-     let rec x = node ...
      let rec f = fun  ...
 
    Note that we normalised the AST after parsing, so
@@ -271,7 +268,7 @@ and filter state pat_env patterns values =
 
    The implementation of [eval_let_rec_bindings] performs two passes
    on the bindings (divided into three phases).
-*)
+ *)
 
 
 (* The function [eval_let_rec_fun_bindings] evaluates mutually
