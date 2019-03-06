@@ -340,7 +340,7 @@ and eval_expr state = function
      | _ -> raise (Type_error (state, __LOC__)))
 | Cat (reg,(arg1,_,arg2)) ->
     let thread, v1 = eval_expr state arg1 in
-    let thread, v2 = eval_expr  State.{state with thread} arg2 in
+    let thread, v2 = eval_expr State.{state with thread} arg2 in
     (match v1, v2 with
       Value.Str (_,s1), Value.Str (_,s2) -> thread, Value.Str (reg, s1 ^ s2)
     | _ -> raise (Type_error (State.{state with thread}, __LOC__)))

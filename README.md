@@ -1,21 +1,27 @@
-# A series of programming languages for the compilation to Michelson
+# A Mini-ML programming language
 
-In particular, two Mini-ML languages and their interpreter in
-OCaml. Some also have a translator to OCaml in case the Mini-ML is not
-a strict subset of OCaml (e.g. is a Domain-Specific Language).
+Mini-ML is toy subset of OCaml, except for the fact that the `match`
+construct is closed by the keyword `end`. An interpreter and a
+transpiler to OCaml are provided. There is no type-checker, so, if you
+need type inference, you need to run the transpiler and then run an
+OCaml compiler on the generated code.
+
+The directory `Lang1` contains the most complete version of Mini-ML.
 
 # Build
 
-Obviously, you need the OCaml system.
+Obviously, you need the OCaml system, but also the libraries `getopt`
+and `zarith`. We recommend to use `opam`:
 
-In order to build those interpreters, you need to clone the following
-repositories in the directory containing the present sources:
+         $ opam install getopt zarith
+
+You also need a library available at this github account: clone the
+following repository in the directory containing the present sources:
 
          $ git clone https://github.com/rinderknecht/UnionFind
-         $ git clone https://github.com/rinderknecht/OCaml-build
 
-In each directory (one per language), create the symbolic links for
-third-party OCaml libraries, if any:
+In the directory `Lang1`, create the symbolic links for third-party
+OCaml libraries, if any, by running
 
          $ ./link.sh
 
