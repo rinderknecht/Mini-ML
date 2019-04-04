@@ -45,11 +45,11 @@ open AST
 
 (* Keywords, symbols, literals and virtual tokens *)
 
-let kwd(X) == ~=oreg(X);    <>
-let sym(X) == ~=oreg(X);    <>
-let ident  == ~=reg(Ident); <>
-let string == ~=reg(Str);   <>
-let eof    == ~=oreg(EOF);  <>
+kwd(X) : oreg(X)    { $1 }
+sym(X) : oreg(X)    { $1 }
+ident  : reg(Ident) { $1 }
+string : reg(Str)   { $1 }
+eof    : oreg(EOF)  { $1 }
 
 (* Compounded constructs *)
 

@@ -1,142 +1,134 @@
-(* Extended Backus-Naur Form (EBNF) for Morley *)
+(* Extended Backus-Naur Form (EBNF) for Mini-ML
 
-(* Toplevel *)
+   This is not a strict subset of OCaml because the "match" construct
+   is closed here with the keyword "end".
 
-program ::=
-  type_decl*
-  parameter_decl
-  storage_decl
-  operation_decl
-  function_decl*
-  block
-  EOF
+   Terminal are either excerpts of concrete syntax between double
+   quotes, e.g. ";", or start with a capital letter.
 
-parameter_decl ::= "parameter" Ident
+   Non-terminals start with a small letter.
 
-storage_decl ::= "storage" type_expr
+   {non_terminal TERMINAL ...}+ : A non-empty sequence of
+                                  non-terminal separated by a terminal
 
-operation_decl ::= "operations" Ident
+   {non_terminal TERMINAL ...}* : A possibly empty sequence of
+                                  non-terminals separated by terminal
 
-(* Type declarations *)
+   non_terminal+                : A non-empty sequence of non-terminals
 
-type_decl ::= "type" Ident "is" type_def
+   non_terminal*                : A possibly empty sequence of non-terminals
+*)
 
-type_def ::=
-  type_expr
-| variants
-| record_decl
+program ::= statement* EOF
+
+statement ::=
+  "let"         let_bindings
+| "let"  "rec"  let_rec_bindings
+| "type" "rec"? type_bindings
+
+(* Type definitions *)
+
+type_bindings ::= {type_binding "and" ...}+
+
+type_binding ::= type_tuple? Ident "=" type_expr
+
+type_tuple ::=
+  "(" {type_name "," ...}+ ")"
+| type_name
+
+type_name ::=
+  Ident     (*  t int string unit bool *)
+| TypeVar   (* 'a *)
 
 type_expr ::=
-  closed_type_expr
-| open_type_expr
+  cartesian
+| sum_type
+| record_type
 
-closed_type_expr ::=
+cartesian ::= {core_type "*" ...}+
+
+core_type ::=
+  type_name
+| "(" cartesian ")"
+| core_type Ident
+| "(" core_type ")"
+
+sum_type ::= {variant "|" ...}+
+
+variant ::= Constr "of" cartesian
+
+record_type ::= "{" {field_decl ";" ...}+ "}"
+
+field_decl ::= field_name ":" cartesian
+
+(* Recursive function definitions *)
+
+let_rec_bindings ::= {let_rec_binding "and" ...}+
+
+let_rec_binding ::=
+  Ident pattern+ "=" expr
+| Ident          "=" fun_expr
+
+(* Non-recursive value definitions *)
+
+let_bindings ::= {let_binding "and" ...}+
+
+let_binding ::=
+  Ident pattern+ "=" expr
+| let_lhs        "=" expr
+
+(* Patterns *)
+
+let_lhs ::=
+  pattern cons cons_pat
+| {pattern "," ...}+
+| common_pattern
+
+common_pattern ::=
   Ident
-| const_type_constr
-| "(" type_expr ")"
+| "_"
+| "()"
+| Int
+| "true"
+| "false"
+| String
+| "[" {cons_pat ";" ...}* "]"
+| "(" ptuple ")"
 
-comparable_type ::=
-  "int"
-| "nat"
-| "string"
-| "bytes"
-| "mutez"
-| "bool"
-| "key_hash"
-| "timestamp"
+ptuple ::= {cons_pat "," ...}+
 
-const_type_constr ::=
-  comparable_type
-| "key"
-| "unit"
-| "signature"
-| "operation"
-| "address"
+unit ::= "(" ")"
 
-open_type_expr ::=
-  "list"    domain
-| "option"  domain
-| "ref"     domain
-| "set"     ordered_domain
-| "map"     ordered_domain range
-| "big_map" ordered_domain range
-| {type_expr "*" ...}+
+cons_pat ::=
+  pattern "::" cons_pat
+| pattern
 
-domain ::= closed_type_expr
-range  ::= closed_type_expr
-
-ordered_domain ::=
-  comparable_type
-| Ident
-
-variants ::= {variant "|" ...}+
-variant  ::= Constr "of" type_expr
-
-record_decl ::= "{" {field_decl ";" ...}+ "}"
-field_decl  ::= Ident ":" type_expr
-
-(* Function declarations *)
-
-function_decl ::=
-  "function" Ident parameters ":" type_expr "=" block "with" Ident
-
-parameters ::= "(" {param_decl ";" ...}* ")"
-
-param_decl ::= ("var" | "const") Ident ":" type_expr
-
-block ::=
-  "begin"
-    value_decls
-    instructions
-  "end"
-
-value_decls ::= {value_decl ";" ...}*
-
-value_decl ::=
-  var_decl
-| function_decl
-
-var_decl ::= "var" Ident ":" type_expr ":=" expr
-
-instructions ::= {instruction ";" ...}*
-
-instruction ::=
-  single_instr
-| block
-
-single_instr ::=
-  conditional
-| match
-| asgnmnt
-| loop
-
-conditional ::= "if" expr "then" instruction "else" instruction
-
-match ::= "match" expr "with" {case "|" ...}+ "end"
-
-case ::= pattern "->" instruction
-
-asgnmnt ::= Ident ":=" expr
-
-loop ::=
-  while
-| for
-
-while ::= "while" expr block
-
-for ::=
-  "for" asgnmnt ["down"] "to" expr ["step" expr] block
-| "for" Ident ["->" Ident] "in" expr block
+pattern ::=
+  "(" cons_pat ")"
+| common_pattern
 
 (* Expressions *)
 
 expr ::=
-  cons_expr "^" expr
-| cons_expr
+  let_expr
+| conditional
+| fun_expr
+| match_expr
+| {disj_expr "," ...}+
 
-cons_expr ::=
-  disj_expr "::" cons_expr
-| disj_expr
+match_expr ::=
+  "match" expr "with" {case "|" ...}+ "end"
+
+case ::=
+  let_lhs "->" expr
+
+let_expr ::=
+  "let"       let_bindings     "in" expr
+| "let" "rec" let_rec_bindings "in" expr
+
+conditional ::= "if" expr "then" expr "else" expr
+
+fun_expr ::= "fun" pattern+ "->" expr
 
 disj_expr ::=
   disj_expr "||" conj_expr
@@ -147,12 +139,20 @@ conj_expr ::=
 | comp_expr
 
 comp_expr ::=
-  comp_expr "<"   add_expr
-| comp_expr "<="  add_expr
-| comp_expr ">"   add_expr
-| comp_expr ">="  add_expr
-| comp_expr "="   add_expr
-| comp_expr "=/=" add_expr
+  comp_expr "<"  cat_expr
+| comp_expr "<=" cat_expr
+| comp_expr ">"  cat_expr
+| comp_expr ">=" cat_expr
+| comp_expr "="  cat_expr
+| comp_expr "<>" cat_expr
+| cat_expr
+
+cat_expr ::=
+  cons_expr "^" cat_expr
+| cons_expr
+
+cons_expr ::=
+  add_expr "::" cons_expr
 | add_expr
 
 add_expr ::=
@@ -169,44 +169,18 @@ mult_expr ::=
 unary_expr ::=
   "-" core_expr
 | "not" core_expr
+| primary_expr
+
+primary_expr ::=
+  primary_expr core_expr
 | core_expr
 
 core_expr ::=
   Int
 | Ident
 | String
+| "()"
 | "false"
 | "true"
-| tuple
-| "[" {expr "," ...}+ "]"
-| "{" {expr "," ...}+ "}"
-| "(" "[" "]" ":" type_expr ")"
-| "(" "None"  ":" type_expr ")"
-| Ident tuple
-| "nat" "(" expr ")"
+| "[" {expr ";" ...}* "]"
 | "(" expr ")"
-| Ident "." "[" expr "]"
-
-tuple ::= "(" {expr "," ...}* ")"
-
-(* Patterns *)
-
-pattern ::=
-  head "<:" cons
-| core_pattern
-
-head ::=
-  "(" cons ")"
-| core_pattern
-
-cons ::= {head "<:" ...}+
-
-core_pattern ::=
-  Ident
-| "_"
-| Int
-| String
-| "false"
-| "true"
-| "[" {cons "," ...}* "]"
-| "(" {cons "," ...}* ")"
