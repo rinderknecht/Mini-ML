@@ -204,7 +204,7 @@ rule scan = parse
 
 | "(*" { let start = Lexing.lexeme_start_p lexbuf
          and stop  = Lexing.lexeme_end_p   lexbuf
-         in comment start stop lexbuf;
+         in scan_comment start stop lexbuf;
          scan lexbuf }
 
 | eof    { Token.EOF }
@@ -213,17 +213,18 @@ rule scan = parse
 
 (* Comments *)
 
-and comment start stop = parse
+and scan_comment start stop = parse
   "(*"    { let start' = Lexing.lexeme_start_p lexbuf
             and stop'  = Lexing.lexeme_end_p   lexbuf
-            in comment start' stop' lexbuf;
-               comment start  stop  lexbuf }
+            in scan_comment start' stop' lexbuf;
+               scan_comment start  stop  lexbuf }
 | "*)"    { () }
 | newline { Lexing.new_line lexbuf;
-            comment start stop lexbuf }
+            scan_comment start stop lexbuf }
 | eof     { let region = Region.make ~start ~stop
             in raise (Error ("Open comment.", region)) }
-| _       { comment start stop lexbuf }
+| '"' string '"'
+| _       { scan_comment start stop lexbuf }
 
 (* END LEXER DEFINITION *)
 
