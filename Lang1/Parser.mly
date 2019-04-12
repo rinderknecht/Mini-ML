@@ -182,7 +182,7 @@ expr:
 | disj_expr                                                        {         $1 }
 
 match_expr:
-  kwd(Match) expr kwd(With) bsv(case) kwd(End)                 { $1,$2,$3,$4,$5 }
+  kwd(Match) expr kwd(With) bsv(case)                             { $1,$2,$3,$4 }
 
 case:
   let_lhs sym(ARROW) expr                                            { $1,$2,$3 }

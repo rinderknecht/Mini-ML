@@ -19,7 +19,6 @@ type 'a reg = Region.t * 'a
 
 type kwd_and   = Region.t
 type kwd_else  = Region.t
-type kwd_end   = Region.t
 type kwd_false = Region.t
 type kwd_fun   = Region.t
 type kwd_if    = Region.t
@@ -180,7 +179,7 @@ and expr =
 | List    of expr ssv bra reg                                (* [e1; e2; ...] *)
 | Extern  of extern
 
-and match_expr = kwd_match * expr * kwd_with * cases * kwd_end
+and match_expr = kwd_match * expr * kwd_with * cases
 
 and cases = (pattern * arrow * expr) bsv
 

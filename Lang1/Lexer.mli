@@ -38,6 +38,9 @@ val reset     : file:string -> ?line:int -> Lexing.lexbuf -> unit
 
 type file_path = string
 
+val scan :
+  file_path option -> (Lexing.lexbuf -> out_channel -> Token.t -> unit) -> unit
+
 val trace        : file_path option -> unit
 val prerr        : kind:string -> diagnostic -> unit
 val format_error : kind:string -> message reg -> string

@@ -466,7 +466,7 @@ and eval_expr state = function
 |          List l -> eval_expr_list state l
 |        Extern e -> eval_external state e
 
-and eval_match state (_, expr, _, cases, _) =
+and eval_match state (_, expr, _, cases) =
   let env = state.State.env in
   let thread, value = eval_expr state expr in
   let state = State.{thread; env = Env.empty}

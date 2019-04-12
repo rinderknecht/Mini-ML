@@ -156,7 +156,7 @@ and edit_expr expr =
      | Extern _            -> region_of_expr e |> Region.stop_loc |> copy_to
      )
 
-and edit_match (kwd_match, expr, kwd_with, cases, _kwd_end) =
+and edit_match (kwd_match, expr, kwd_with, cases) =
   copy_to (Region.start_loc kwd_match)
 <@ insert "("
 <@ edit_expr expr

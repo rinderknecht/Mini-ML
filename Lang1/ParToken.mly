@@ -40,7 +40,6 @@
 
 %token And
 %token Else
-%token End
 %token False
 %token Fun
 %token If

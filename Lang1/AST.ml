@@ -10,7 +10,6 @@ type 'a reg = Region.t * 'a
 
 type kwd_and   = Region.t
 type kwd_else  = Region.t
-type kwd_end   = Region.t
 type kwd_false = Region.t
 type kwd_fun   = Region.t
 type kwd_if    = Region.t
@@ -168,7 +167,7 @@ and expr =
 | List    of expr ssv bra reg                                (* [e1; e2; ...] *)
 | Extern  of extern
 
-and match_expr = kwd_match * expr * kwd_with * cases * kwd_end
+and match_expr = kwd_match * expr * kwd_with * cases
 
 and cases = (pattern * arrow * expr) bsv
 
@@ -308,7 +307,7 @@ and expr_to_string = function
 | Call (_,(func,arg)) ->
     sprintf "Call (%s, %s)" (expr_to_string func) (expr_to_string arg)
 
-and match_expr_to_string (_,expr,_,cases,_) =
+and match_expr_to_string (_,expr,_,cases) =
   sprintf "Match (%s, %s)" (expr_to_string expr) (cases_to_string cases)
 
 and cases_to_string cases =
@@ -538,7 +537,7 @@ and print_pattern = function
     print_token rbra "]"
 | Pvar (reg,var) -> Printf.printf "%s: Pvar %s\n" (Region.compact reg) var
 | Punit (_,(lpar,rpar)) -> print_token lpar "("; print_token rpar ")"
-| Pint (reg,z) -> print_token reg (sprintf "(Int %s)" (Z.to_string z))
+| Pint (reg,z) -> print_token reg (sprintf "Int %s" (Z.to_string z))
 | Ptrue kwd_true -> print_token kwd_true "true"
 | Pfalse kwd_false -> print_token kwd_false "false"
 | Pstr s -> print_str s
@@ -606,12 +605,12 @@ and print_expr undo = function
     print_token lbra "["; print_ssv (print_expr undo) ssv; print_token rbra "]"
 | Extern _ -> ()
 
-and print_match_expr undo (kwd_match, expr, kwd_with, cases, kwd_end) =
-  print_token kwd_match "(match";
+and print_match_expr undo (kwd_match, expr, kwd_with, cases) =
+  print_token kwd_match "match";
   print_expr undo expr;
   print_token kwd_with "with";
   print_bsv (print_case undo) cases;
-  print_token kwd_end ")"
+  print_token Region.ghost "end"
 
 and print_case undo (pattern, arrow, expr) =
   print_pattern pattern;
@@ -719,7 +718,7 @@ and fv_expr env fv = function
 |        List (_,(_,l,_)) -> sepseq_foldl (fv_expr env) fv l
 | Int _ | Str _ | Unit _ | True _ | False _ | Extern _ -> fv
 
-and fv_match_expr env fv (_, expr, _, cases,_) =
+and fv_match_expr env fv (_, expr, _, cases(*,_*)) =
   fv_cases env (fv_expr env fv expr) cases
 
 and fv_cases env fv cases = nsepseq_foldl (fv_case env) fv cases

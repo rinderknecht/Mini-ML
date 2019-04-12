@@ -29,7 +29,6 @@ let keywords =
          "if",     Some If;
          "in",     Some In;
          "else",   Some Else;
-         "end",    Some End;
          "let",    Some Let;
          "match",  Some Match;
          "mod",    Some Mod;
@@ -50,6 +49,7 @@ let keywords =
          "do",          None;
          "done",        None;
          "downto",      None;
+         "end",         None;
          "exception",   None;
          "external",    None;
          "for",         None;
@@ -269,6 +269,23 @@ let trace file_opt =
       try
         let t = scan buffer in
         output_token buffer stdout t;
+        if t = Token.EOF then (close_in cin; close_out stdout) else iter ()
+      with Error diag ->
+             close_in cin; close_out stdout; prerr ~kind:"Lexical" diag
+    in reset buffer; iter ()
+  with Sys_error msg -> highlight msg
+
+let scan file_opt action =
+  try
+    let cin, reset =
+      match file_opt with
+        None | Some "-" -> stdin, fun ?(line=1) _buffer -> ignore line
+      |       Some file -> open_in file, reset ~file in
+    let buffer = Lexing.from_channel cin in
+    let rec iter () =
+      try
+        let t = scan buffer in
+        action buffer stdout t;
         if t = Token.EOF then (close_in cin; close_out stdout) else iter ()
       with Error diag ->
              close_in cin; close_out stdout; prerr ~kind:"Lexical" diag

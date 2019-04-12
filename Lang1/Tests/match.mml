@@ -1,0 +1,6 @@
+let () =
+  match 3 with
+    1 -> ()
+  | 3 -> match 4 with
+           1 -> ()
+         | 4 -> ()
