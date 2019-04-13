@@ -718,7 +718,7 @@ and fv_expr env fv = function
 |        List (_,(_,l,_)) -> sepseq_foldl (fv_expr env) fv l
 | Int _ | Str _ | Unit _ | True _ | False _ | Extern _ -> fv
 
-and fv_match_expr env fv (_, expr, _, cases(*,_*)) =
+and fv_match_expr env fv (_, expr, _, cases) =
   fv_cases env (fv_expr env fv expr) cases
 
 and fv_cases env fv cases = nsepseq_foldl (fv_case env) fv cases

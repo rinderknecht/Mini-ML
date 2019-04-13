@@ -6,4 +6,7 @@ Printexc.record_backtrace true;;
 
 (* Running the lexer on the source *)
 
-Lexer.trace EvalOpt.input;;
+if Utils.String.Set.mem "lexer" EvalOpt.verbose then
+  Lexer.trace EvalOpt.input
+else Lexer.scan EvalOpt.input (fun _lexbuf _out _token -> ())
+;;
