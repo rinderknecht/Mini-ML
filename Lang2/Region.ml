@@ -1,69 +1,128 @@
-(* Regions of the input file *)
+(* Regions of a file *)
 
-type t = {start: Pos.t; stop: Pos.t}
+let sprintf = Printf.sprintf
+
+type t = <
+  start : Pos.t;
+  stop  : Pos.t;
+
+  (* Setters *)
+
+  shift_bytes     : int -> t;
+  shift_one_uchar : int -> t;
+  set_file        : string -> t;
+
+  (* Getters *)
+
+  file      : string;
+  pos       : Pos.t * Pos.t;
+  byte_pos  : Lexing.position * Lexing.position;
+
+  (* Predicates *)
+
+  is_ghost : bool;
+
+  (* Conversions to [string] *)
+
+  to_string : ?file:bool -> ?offsets:bool -> [`Byte | `Point] -> string;
+  compact   : ?file:bool -> ?offsets:bool -> [`Byte | `Point] -> string
+>
+
 type region = t
+
+type 'a reg = {region: t; value: 'a}
 
 (* Injections *)
 
 exception Invalid
 
-let make ~start ~stop =
-  let open Lexing in
-  if start.pos_fname <> stop.pos_fname
-  || start.pos_cnum > stop.pos_cnum then raise Invalid
-  else {start; stop}
+let make ~(start: Pos.t) ~(stop: Pos.t) =
+  if start#file <> stop#file || start#byte_offset > stop#byte_offset
+  then raise Invalid
+  else
+    object
+      val    start = start
+      method start = start
+      val    stop  = stop
+      method stop  = stop
 
-let ghost = {start = Lexing.dummy_pos; stop = Lexing.dummy_pos}
+      method shift_bytes len =
+        let start = start#shift_bytes len
+        and stop  = stop#shift_bytes len
+        in {< start = start; stop = stop >}
 
-(* Projections *)
+      method shift_one_uchar len =
+        let start = start#shift_one_uchar len
+        and stop  = stop#shift_one_uchar len
+        in {< start = start; stop = stop >}
 
-let start_pos {start; _} = start
-let stop_pos  {stop;  _} = stop
+      method set_file name =
+        let start = start#set_file name
+        and stop  = stop#set_file name
+        in {< start = start; stop = stop >}
 
-let start_loc {start; _} = Loc.from_pos start
-let stop_loc  {stop;  _} = Loc.from_pos stop
+      (* Getters *)
 
-let file {start; _} = start.Lexing.pos_fname
+      method file      = start#file
+      method pos       = start, stop
+      method byte_pos  = start#byte, stop#byte
 
-let pos  {start; stop} = start, stop
-let locs {start; stop} = Loc.(from_pos start, from_pos stop)
+      (* Predicates *)
+
+      method is_ghost = start#is_ghost && stop#is_ghost
+
+      (* Conversions to strings *)
+
+      method to_string ?(file=true) ?(offsets=true) mode =
+        let horizontal = if offsets then "character"  else "column"
+        and start_offset =
+          if offsets then start#offset mode else start#column mode
+        and stop_offset =
+          if offsets then stop#offset mode else stop#column mode in
+        let info =
+          if   file
+          then sprintf "in file \"%s\", line %i, %s"
+                 (String.escaped start#file) start#line horizontal
+          else sprintf "at line %i, %s" start#line horizontal
+        in if   stop#line = start#line
+           then sprintf "%ss %i-%i" info start_offset stop_offset
+           else sprintf "%s %i to line %i, %s %i"
+                  info start_offset stop#line horizontal stop_offset
+
+      method compact ?(file=true) ?(offsets=true) mode =
+        let start_str = start#anonymous ~offsets mode
+        and stop_str  = stop#anonymous ~offsets mode in
+        if start#file = stop#file then
+          if file then sprintf "%s:%s-%s" start#file start_str stop_str
+          else sprintf "%s-%s" start_str stop_str
+        else sprintf "%s:%s-%s:%s" start#file start_str stop#file stop_str
+    end
+
+(* Special regions *)
+
+let ghost = make ~start:Pos.ghost ~stop:Pos.ghost
+
+let min = make ~start:Pos.min ~stop:Pos.min
 
 (* Comparisons *)
 
-let leq r1 r2 = r1.start <= r2.start
+let equal r1 r2 =
+   r1#file = r2#file
+&& Pos.equal r1#start r2#start
+&& Pos.equal r1#stop  r2#stop
 
-(* Predicates *)
+let lt r1 r2 =
+  r1#file = r2#file
+&& not r1#is_ghost
+&& not r2#is_ghost
+&& Pos.lt r1#start r2#start
+&& Pos.lt r1#stop  r2#stop
 
-let is_ghost = (=) ghost
-
-(* Conversions to [string] *)
-
-let to_string ?(file=true) {start; stop} =
-  let open Lexing in
-  let start_col_pos = start.pos_cnum - start.pos_bol
-  and stop_col_pos  = stop.pos_cnum - stop.pos_bol in
-  let info =
-    if file then
-      Printf.sprintf "file \"%s\", line %i, char" start.pos_fname start.pos_lnum
-    else Printf.sprintf "line %i, char" start.pos_lnum
-  in if stop.pos_lnum = start.pos_lnum
-     then Printf.sprintf "%sacters %i-%i" info start_col_pos stop_col_pos
-     else Printf.sprintf "%s %i to line %i, char %i"
-                         info start_col_pos stop.pos_lnum stop_col_pos
-
-let anon_pos ?(offsets=true) pos =
-  if pos = Lexing.dummy_pos then "ghost"
-  else Printf.sprintf "%i:%i"
-        (Pos.get_line pos)
-        Pos.((if offsets then get_offset else get_column) pos)
-
-let compact ?(offsets=true) {start; stop} =
-  let start_file = Pos.get_file start
-  and stop_file  = Pos.get_file stop in
-  if start_file = stop_file then
-    Printf.sprintf "%s:%s-%s"
-      start_file (anon_pos ~offsets start) (anon_pos ~offsets stop)
-  else
-    Printf.sprintf "%s:%s-%s:%s"
-      start_file (anon_pos ~offsets start)
-      stop_file  (anon_pos ~offsets stop)
+let cover r1 r2 =
+  if r1#is_ghost
+  then r2
+  else if r2#is_ghost
+       then r1
+       else if   lt r1 r2
+            then make ~start:r1#start ~stop:r2#stop
+            else make ~start:r2#start ~stop:r1#stop

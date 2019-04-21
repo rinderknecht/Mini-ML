@@ -38,8 +38,8 @@ val reset     : file:string -> ?line:int -> Lexing.lexbuf -> unit
 
 type file_path = string
 
-val scan :
-  file_path option -> (Lexing.lexbuf -> out_channel -> Token.t -> unit) -> unit
+val iter :
+  (Lexing.lexbuf -> out_channel -> Token.t -> unit) -> file_path option -> unit
 
 val trace        : file_path option -> unit
 val prerr        : kind:string -> diagnostic -> unit

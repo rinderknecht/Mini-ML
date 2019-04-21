@@ -1,0 +1,8 @@
+let () =
+  match z with
+    None -> Some 3
+  | Some n -> Some (n+1)
+
+let () =
+  match q with
+    A (A x) -> x

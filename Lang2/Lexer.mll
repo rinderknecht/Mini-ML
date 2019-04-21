@@ -3,90 +3,132 @@
 {
 (* START HEADER *)
 
-open! Utils
+(* UTILITIES *)
 
-(* Lexical errors *)
+let sprintf = Printf.sprintf
+module SMap = Utils.String.Map
+
+(* STRING PROCESSING *)
+
+(* The value of [mk_str len p] ("make string") is a string of length
+   [len] containing the [len] characters in the list [p], in reverse
+   order. For instance, [mk_str 3 ['c';'b';'a'] = "abc"]. *)
+
+let mk_str (len: int) (p: char list) : string =
+  let bytes = Bytes.make len ' ' in
+  let rec fill i = function
+         [] -> bytes
+  | char::l -> Bytes.set bytes i char; fill (i-1) l
+  in fill (len-1) p |> Bytes.to_string
+
+(* The call [explode s a] is the list made by pushing the characters
+   in the string [s] on top of [a], in reverse order. For example,
+   [explode "ba" ['c';'d'] = ['a'; 'b'; 'c'; 'd']]. *)
+
+let explode s acc =
+  let rec push = function
+    0 -> acc
+  | i -> s.[i-1] :: push (i-1)
+in push (String.length s)
+
+type thread = {
+  opening : Region.t;
+  len     : int;
+  acc     : char list
+}
+
+let push_char char {opening; len; acc} =
+  {opening; len=len+1; acc=char::acc}
+
+let push_string str {opening; len; acc} =
+  {opening;
+   len = len + String.length str;
+   acc = explode str acc}
+
+(* LEXICAL ERRORS *)
 
 type message = string
-type diagnostic = message * Region.t
 
-exception Error of diagnostic
+exception Error of message Region.reg
 
 let error lexbuf msg =
-  let start  = Lexing.lexeme_start_p lexbuf
-  and stop   = Lexing.lexeme_end_p   lexbuf in
+  let start  = Pos.from_byte (Lexing.lexeme_start_p lexbuf)
+  and stop   = Pos.from_byte (Lexing.lexeme_end_p   lexbuf) in
   let region = Region.make ~start ~stop
-  in raise (Error (msg,region))
+  in raise (Error Region.{region; value=msg})
 
-(* Keywords *)
+let fail region value = raise (Error Region.{region; value})
 
-let keywords =
-  Token.["and",    Some And;
-         "else",   Some Else;
-         "false",  Some False;
-         "fun",    Some Fun;
-         "if",     Some If;
-         "in",     Some In;
-         "else",   Some Else;
-         "end",    Some End;
-         "let",    Some Let;
-         "match",  Some Match;
-         "mod",    Some Mod;
-         "not",    Some Not;
-         "rec",    Some Rec;
-         "then",   Some Then;
-         "true",   Some True;
-         "with",   Some With;
+(* KEYWORDS *)
 
-         (* Reserved *)
+let keywords = Token.[
+  "and",    Some And;
+  "else",   Some Else;
+  "false",  Some False;
+  "fun",    Some Fun;
+  "if",     Some If;
+  "in",     Some In;
+  "else",   Some Else;
+  "end",    Some End;
+  "let",    Some Let;
+  "match",  Some Match;
+  "mod",    Some Mod;
+  "not",    Some Not;
+  "rec",    Some Rec;
+  "then",   Some Then;
+  "true",   Some True;
+  "type",   Some Type;
+  "with",   Some With;
 
-         "as",          None;
-         "asr",         None;
-         "assert",      None;
-         "begin",       None;
-         "class",       None;
-         "constraint",  None;
-         "do",          None;
-         "done",        None;
-         "downto",      None;
-         "exception",   None;
-         "external",    None;
-         "for",         None;
-         "function",    None;
-         "functor",     None;
-         "include",     None;
-         "inherit",     None;
-         "initializer", None;
-         "land",        None;
-         "lazy",        None;
-         "lor",         None;
-         "lsl",         None;
-         "lsr",         None;
-         "lxor",        None;
-         "method",      None;
-         "module",      None;
-         "mutable",     None;
-         "new",         None;
-         "nonrec",      None;
-         "object",      None;
-         "of",          None;
-         "open",        None;
-         "or",          None;
-         "private",     None;
-         "sig",         None;
-         "struct",      None;
-         "to",          None;
-         "try",         None;
-         "type",        None;
-         "val",         None;
-         "virtual",     None;
-         "when",        None;
-         "while",       None
-        ]
+  (* Reserved *)
 
-let add map (key,value) = String.Map.add key value map
+  "as",          None;
+  "asr",         None;
+  "assert",      None;
+  "begin",       None;
+  "class",       None;
+  "constraint",  None;
+  "do",          None;
+  "done",        None;
+  "downto",      None;
+  "exception",   None;
+  "external",    None;
+  "for",         None;
+  "function",    None;
+  "functor",     None;
+  "include",     None;
+  "inherit",     None;
+  "initializer", None;
+  "land",        None;
+  "lazy",        None;
+  "lor",         None;
+  "lsl",         None;
+  "lsr",         None;
+  "lxor",        None;
+  "method",      None;
+  "module",      None;
+  "mutable",     None;
+  "new",         None;
+  "nonrec",      None;
+  "object",      None;
+  "open",        None;
+  "or",          None;
+  "private",     None;
+  "sig",         None;
+  "struct",      None;
+  "to",          None;
+  "try",         None;
+  "val",         None;
+  "virtual",     None;
+  "when",        None;
+  "while",       None
+]
 
-let kwd_map = List.fold_left add String.Map.empty keywords
+let add map (key,value) = SMap.add key value map
+
+let kwd_map = List.fold_left add SMap.empty keywords
+
+(* LEXER ENGINE *)
 
 (* Resetting file name and line number (according to #line directives) *)
 
@@ -111,6 +153,13 @@ let rollback lexbuf =
     {lexbuf.lex_curr_p with pos_cnum = lexbuf.lex_curr_p.pos_cnum - len}
 *)
 
+(* REGIONS *)
+
+let mk_region start stop =
+  let start = Pos.from_byte start
+  and stop  = Pos.from_byte stop
+  in Region.make ~start ~stop
+
 (* END HEADER *)
 }
 
@@ -118,111 +167,135 @@ let rollback lexbuf =
 
 (* Auxiliary regular expressions *)
 
-let newline    = '\n' | '\r' | "\r\n"
-let blank      = ' ' | '\t'
-let lowercase  = ['a'-'z' '_']
-let uppercase  = ['A'-'Z' '_']
-let letter     = lowercase | uppercase
-let ident_char = ['A'-'Z' 'a'-'z' '_' '\'' '0'-'9']
-let ident      = lowercase ident_char*
-let uident     = uppercase ident_char*
-let digit      = ['0'-'9']
-let integer    = '0' | ['1'-'9'] digit*
-let number     = integer
-let escaped    = "\\n" | "\\\"" | "\\?" | "\\\\" | "\\a"
-                 | "\\b" | "\\f" | "\\n" | "\\r" | "\\t" | "\\v"
-                 | "\\0" digit digit
-let str_char   = [^'"' '\\' '\n'] | escaped
-let string     = str_char*
+let nl       = ['\n' '\r']
+let blank    = [' ' '\t']
+
+let digit    = ['0'-'9']
+let natural  = digit | digit (digit | '_')* digit
+let integer  = '-'? natural
+
+let small    = ['a'-'z']
+let capital  = ['A'-'Z']
+let letter   = small | capital
+
+let ichar    = letter | digit | ['_' '\'']
+let ident    = small ichar* | '_' ichar+
+let uident   = capital ichar*
+let tparam   = "'" ident (* Type parameters. Unused yet *)
+
+let hexa     = digit | ['A'-'F']
+let byte     = hexa hexa
+
+let esc      = "\\n" | "\\\\" | "\\b" | "\\r" | "\\t"
+let schar    = [^'"' '\\'] # nl (* TODO: Test *)
+               | "\\\"" | esc | "\\x" byte | "\\0" digit digit
+let string   = '"' schar* '"'
+let char_set = [^'\'' '\\'] # nl (* TODO: Test *)
+               | "\\'" | esc | "\\x" byte | "\\0" digit digit
+let char     = "'" char_set "'"
 
 (* Rules *)
 
 rule scan = parse
-  newline { Lexing.new_line lexbuf; scan lexbuf }
-| blank+  { scan lexbuf }
+  nl     { Lexing.new_line lexbuf; scan lexbuf }
+| blank+ { scan lexbuf }
 
-| "->" { Token.ARROW    }
-| "::" { Token.CONS     }
-| "^"  { Token.CAT      }
-| "|"  { Token.BAR      }
+| "->"   { Token.ARROW    }
+| "::"   { Token.CONS     }
+| "^"    { Token.CAT      }
 
-| "="  { Token.EQ       }
-| "<>" { Token.NE       }
-| "<"  { Token.LT       }
-| ">"  { Token.GT       }
-| "<=" { Token.LE       }
-| ">=" { Token.GE       }
+| "="    { Token.EQ       }
+| "<>"   { Token.NE       }
+| "<"    { Token.LT       }
+| ">"    { Token.GT       }
+| "<="   { Token.LE       }
+| ">="   { Token.GE       }
 
-| "&&" { Token.BOOL_AND }
-| "||" { Token.BOOL_OR  }
+| "&&"   { Token.BOOL_AND }
+| "||"   { Token.BOOL_OR  }
 
-| "-"  { Token.MINUS    }
-| "+"  { Token.PLUS     }
-| "/"  { Token.DIV      }
-| "*"  { Token.MULT     }
+| "-"    { Token.MINUS    }
+| "+"    { Token.PLUS     }
+| "/"    { Token.SLASH    }
+| "*"    { Token.TIMES    }
 
-| "("  { Token.LPAR     }
-| ")"  { Token.RPAR     }
-| "["  { Token.LBRACK   }
-| "]"  { Token.RBRACK   }
+| "("    { Token.LPAR     }
+| ")"    { Token.RPAR     }
+| "["    { Token.LBRACK   }
+| "]"    { Token.RBRACK   }
+| "{"    { Token.LBRACE   }
+| "}"    { Token.RBRACE   }
 
-| ","  { Token.COMMA    }
-| ";"  { Token.SEMI     }
+| ","    { Token.COMMA    }
+| ";"    { Token.SEMI     }
+| ":"    { Token.COLON    }
+| "|"    { Token.VBAR     }
 
-| "_"  { Token.WILD     }
+| "_"    { Token.WILD     }
+| eof    { Token.EOF      }
 
-| '"' (string as s) '"' { Token.Str s }
-
-| '0' digit+ as n {
-    let msg = Printf.sprintf "Leading zeros in %s are not allowed." n
-    in error lexbuf msg
-  }
-
-| number as n  { Token.Int (Z.of_string n) }
-
-| ident as id {
-    match String.Map.find id kwd_map with
-      None -> let msg =
-               Printf.sprintf "Keyword \"%s\" reserved for future use." id
-             in error lexbuf msg
+| integer as n  { Token.Int (Z.of_string n) }
+| uident  as id { Token.Constr id           }
+| ident   as id {
+    match SMap.find id kwd_map with
+      None -> sprintf "Reserved name \"%s\"." id |> error lexbuf
     | Some kwd -> kwd
-    | exception Not_found -> Token.Ident id
-  }
+    | exception Not_found -> Token.Ident id }
 
-| uident as id {
-    match String.Map.find id kwd_map with
-      None -> let msg =
-               Printf.sprintf "Keyword \"%s\" reserved for future use." id
-             in error lexbuf msg
-    | Some kwd -> kwd
-    | exception Not_found ->
-        let msg =
-          Printf.sprintf "Identifiers cannot start with an uppercase letter."
-        in error lexbuf msg
-  }
+| '"'  { let start   = Lexing.lexeme_start_p lexbuf
+         and stop    = Lexing.lexeme_end_p lexbuf in
+         let opening = mk_region start stop in
+         let thread  = {opening; len=1; acc=['"']} in
+         let thread  = scan_string thread lexbuf in
+         let lexeme  = mk_str thread.len thread.acc in
+         let      () = lexbuf.Lexing.lex_start_p <- start
+         in Token.Str lexeme }
 
-| "(*" { let start = Lexing.lexeme_start_p lexbuf
-         and stop  = Lexing.lexeme_end_p   lexbuf
-         in comment start stop lexbuf;
-         scan lexbuf }
+| "(*" { let start   = Lexing.lexeme_start_p lexbuf
+         and stop    = Lexing.lexeme_end_p lexbuf in
+         let opening = mk_region start stop in
+         let thread  = {opening; len=2; acc=['*';'(']} in
+         let thread  = scan_block thread lexbuf in
+         let ()      = ignore thread
+         in scan lexbuf }
 
-| eof    { Token.EOF }
-| _ as c { let msg = Printf.sprintf "Invalid character %c." c
+| _ as c { let msg = sprintf "Invalid character '%s'."
+                       (Char.escaped c)
            in error lexbuf msg }
+
+(* Finishing a string *)
+
+and scan_string thread = parse
+  nl       { fail thread.opening "Broken string."          }
+| eof      { fail thread.opening "Unterminated string."    }
+| '"'      { push_char '"' thread }
+| esc as s { scan_string (push_string s thread) lexbuf     }
+| '\\' _   { let start  = Lexing.lexeme_start_p lexbuf
+             and stop   = Lexing.lexeme_end_p lexbuf in
+             let region = mk_region start stop
+             in fail region "Undefined escape sequence."   }
+| _ as c   { scan_string (push_char c thread) lexbuf       }
 
 (* Comments *)
 
-and comment start stop = parse
-  "(*"    { let start' = Lexing.lexeme_start_p lexbuf
-            and stop'  = Lexing.lexeme_end_p   lexbuf
-            in comment start' stop' lexbuf;
-               comment start  stop  lexbuf }
-| "*)"    { () }
-| newline { Lexing.new_line lexbuf;
-            comment start stop lexbuf }
-| eof     { let region = Region.make ~start ~stop
-            in raise (Error ("Open comment.", region)) }
-| _       { comment start stop lexbuf }
+and scan_block thread = parse
+  '"' | "(*" {
+           let opening  = thread.opening in
+           let start    = Lexing.lexeme_start_p lexbuf
+           and stop     = Lexing.lexeme_end_p lexbuf in
+           let opening' = mk_region start stop in
+           let lexeme   = Lexing.lexeme lexbuf in
+           let thread   = push_string lexeme thread in
+           let thread   = {thread with opening=opening'} in
+           let next     = if lexeme = "\"" then scan_string
+                          else scan_block in
+           let thread   = next thread lexbuf in
+           let thread   = {thread with opening}
+           in scan_block thread lexbuf }
+| "*)"   { push_string (Lexing.lexeme lexbuf) thread }
+| nl     { Lexing.new_line lexbuf; scan_block thread lexbuf }
+| eof    { fail thread.opening "Open comment." }
+| _ as c { scan_block (push_char c thread) lexbuf }
 
 (* END LEXER DEFINITION *)
 
@@ -240,36 +313,44 @@ let get_token ?log =
 
 (* Standalone lexer for debugging purposes *)
 
-let error_to_string ~(kind: string) msg region =
-  Printf.sprintf "%s error in %s:\n%s%!"
-    kind (Region.to_string region) msg
+(* TODO: Move out (functor). See LIGO. *)
 
-let prerr ~(kind: string) (msg, region) =
-  highlight (error_to_string ~kind msg region)
+let format_error ~(kind: string) Region.{region; value=msg} =
+  sprintf "%s error in %s:\n%s%!"
+    kind (region#to_string `Byte) msg
 
-type filename = string
+let prerr ~(kind: string) msg =
+  Utils.highlight (format_error ~kind msg)
+
+type file_path = string
 
 let output_token buffer chan token =
   let open Lexing in
-  let conc = Token.to_string token in
-  let start_pos = buffer.lex_start_p
-  and curr_pos  = buffer.lex_curr_p
-  in Printf.fprintf chan "%s-%s: %s\n%!"
-       (Pos.compact start_pos) (Pos.compact curr_pos) conc
+  let conc  = Token.to_string token in
+  let start = Pos.from_byte buffer.lex_start_p
+  and stop  = Pos.from_byte buffer.lex_curr_p in
+  Printf.fprintf chan "%s-%s: %s\n%!"
+   (start#compact `Byte) (stop#compact `Byte) conc
 
-let trace file =
+let iter action file_opt =
   try
-    let cin = open_in file in
+    let cin, reset =
+      match file_opt with
+        None | Some "-" -> stdin, fun ?(line=1) _ -> ignore line
+      |       Some file -> open_in file, reset ~file in
     let buffer = Lexing.from_channel cin in
     let rec iter () =
       try
         let t = scan buffer in
-        output_token buffer stdout t;
-        if t = Token.EOF then (close_in cin; close_out stdout) else iter ()
+        action buffer stdout t;
+        if t = Token.EOF then (close_in cin; close_out stdout)
+        else iter ()
       with Error diag ->
-             close_in cin; close_out stdout; prerr ~kind:"Lexical" diag
-    in reset ~file buffer; iter ()
-  with Sys_error msg -> highlight msg
+             close_in cin; close_out stdout;
+             prerr ~kind:"Lexical" diag
+    in reset buffer; iter ()
+  with Sys_error msg -> Utils.highlight msg
 
+let trace = iter output_token
 (* END TRAILER *)
 }

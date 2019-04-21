@@ -2,7 +2,7 @@
 
 (* Identity *)
 
-val id: 'a -> 'a
+val id : 'a -> 'a
 
 (* Combinators *)
 

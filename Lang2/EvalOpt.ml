@@ -3,37 +3,37 @@
 let abort msg =
   Utils.highlight (Printf.sprintf "Command-line error: %s" msg); exit 1
 
+let printf  = Printf.printf
+let sprintf = Printf.sprintf
+
 (* Help *)
 
 let help () =
   let file = Filename.basename Sys.argv.(0) in
-  Printf.printf "Usage: %s [<option> ...] <input>.ml\n" file;
-  print_endline "where <input>.ml is the Mini-ML source file,";
+  printf "Usage: %s [<option> ...] [<input>.ml | \"-\"]\n" file;
+  print_endline "where <input>.mml is the Mini-ML source file (default: stdin),";
   print_endline "and each <option> (if any) is one of the following:";
-  print_endline "  -I <paths>                Library paths (colon-separated)";
-  print_endline "  -o, --out=<michel>.son    Compile to Michelson (default \
-                                             <input>.son)";
-  print_endline "  -c <file>.ml              Compile to OCaml";
-  print_endline "  -e, --eval                Evaluate <input>.ml";
-  print_endline "  -r, --raw-edits           No optimisation of edits";
-  print_endline "  -d, --debug=<target>      cmdline, lexer,";
-  print_endline "                            parser, unparsing, norm, eval";
-  print_endline "  -v, --version             Print the version number on \
-                                             stdout and exit";
-  print_endline "  -h, --help                This help";
+  print_endline "  -I <paths>             Library paths (colon-separated)";
+  print_endline "  -c [<file>.ml]         Translate to OCaml in <file>.ml";
+  print_endline "                         (default: <input>.ml)";
+  print_endline "  -e, --eval             Interpret <input>.mml or stdin";
+  print_endline "      --raw-edits        Do not optimise translation edits";
+  print_endline "      --verbose=<phases> Colon-separated phases: cmdline, lexer,";
+  print_endline "                         parser, unparsing, norm, eval";
+  print_endline "      --version          Short commit hash on stdout";
+  print_endline "  -h, --help             This help";
   exit 0
 
 (* Version *)
 
-let version () = Printf.printf "%s\n" Version.version; exit 0
+let version () = printf "%s\n" Version.version; exit 0
 
 (* Specifying the command-line options a la GNU *)
 
 let input     = ref None
 and eval      = ref false
 and compile   = ref None
-and output    = ref None
-and debug     = ref Utils.String.Set.empty
+and verbose   = ref Utils.String.Set.empty
 and libs      = ref []
 and raw_edits = ref false
 
@@ -44,46 +44,41 @@ let split_at_colon = Str.(split (regexp ":"))
 
 let add_path p = libs := !libs @ split_at_colon p
 
-let add_debug d =
-  debug := List.fold_left (Utils.swap Utils.String.Set.add)
-                         !debug
-                         (split_at_colon d)
+let add_verbose d =
+  verbose := List.fold_left (Utils.swap Utils.String.Set.add)
+                            !verbose
+                            (split_at_colon d)
 
 let specs =
   let open! Getopt in [
-    'I',      nolong, None, Some add_path;
-    'o',       "out", set output (Some ""),
-                      set_opt output "Multiple source files";
-    'c',      nolong, set compile (Some ""),
-                      set_opt compile "Multiple OCaml outputs";
-    'e',      "eval", set eval true, None;
-    'r', "raw-edits", set raw_edits true, None;
-    'd',     "debug",         None, Some add_debug;
-    'h',      "help",    Some help, None;
-    'v',   "version", Some version, None;
+    'I',     nolong,      None, Some add_path;
+    'c',     nolong,      set compile (Some ""),
+                          set_opt compile "Multiple OCaml outputs";
+    'e',     "eval",      set eval true, None;
+    noshort, "raw-edits", set raw_edits true, None;
+    noshort, "verbose",   None, Some add_verbose;
+    'h',     "help",      Some help, None;
+    noshort, "version",   Some version, None
   ]
 ;;
 
 (* Handler of anonymous arguments *)
 
 let anonymous arg =
-  if !input = None then
-    if Sys.file_exists arg then input := Some arg
-    else abort (Printf.sprintf "Input file %s does not exist." arg)
-  else abort "Multiple source files."
-;;
+  match !input with
+      None -> input := Some arg
+  | Some _ -> abort (sprintf "Multiple inputs")
 
 (* Parsing the command-line options *)
 
-try Getopt.parse_cmdline specs anonymous with
-  Getopt.Error msg -> abort msg
-;;
+let () = try Getopt.parse_cmdline specs anonymous with
+           Getopt.Error msg -> abort msg
 
 (* Checking options *)
 
 let string_of convert = function
     None -> "None"
-| Some s -> Printf.sprintf "Some %s" (convert s)
+| Some s -> sprintf "Some %s" (convert s)
 
 let string_of_path p =
   let apply s a = if a = "" then s else s ^ ":" ^ a
@@ -91,79 +86,63 @@ let string_of_path p =
 
 let quote s = Printf.sprintf "\"%s\"" s
 
-let debug_str =
+let verb_str =
   let apply e a =
     if a <> "" then Printf.sprintf "%s, %s" e a else e
-  in Utils.String.Set.fold apply !debug ""
+  in Utils.String.Set.fold apply !verbose ""
 
 let print_opt () =
-  Printf.printf "COMMAND LINE\n";
-  Printf.printf "input     = %s\n" (string_of quote !input);
-  Printf.printf "out       = %s\n" (string_of quote !output);
-  Printf.printf "compile   = %s\n" (string_of quote !compile);
-  Printf.printf "eval      = %B\n" !eval;
-  Printf.printf "raw_edits = %b\n" !raw_edits;
-  Printf.printf "debug     = %s\n" debug_str;
-  Printf.printf "libs      = %s\n" (string_of_path !libs)
-;;
+  printf "COMMAND LINE\n";
+  printf "input     = %s\n" (string_of quote !input);
+  printf "compile   = %s\n" (string_of quote !compile);
+  printf "eval      = %B\n" !eval;
+  printf "raw_edits = %b\n" !raw_edits;
+  printf "verbose   = %s\n" verb_str;
+  printf "libs      = %s\n" (string_of_path !libs)
 
-if Utils.String.Set.mem "cmdline" !debug then print_opt ();;
+let () = if Utils.String.Set.mem "cmdline" !verbose then print_opt ()
 
 let input =
   match !input with
-    None | Some "-" -> abort "Source filename missing."
-  | Some input -> if   Filename.check_suffix input ".ml"
-                 then input
-                 else abort "Source file lacks extension .ml."
+    None | Some "-" ->
+     if !compile <> None then
+       abort "An input file is missing (for compilation)."
+     else !input
+  | Some file_path ->
+      if   Filename.check_suffix file_path ".mml"
+      then if   Sys.file_exists file_path
+           then Some file_path
+           else abort "Source file not found."
+      else abort "Source file lacks the extension .mml."
 
 let compile =
   match !compile with
-    None | Some "-" -> !compile
+    Some _ when !eval -> abort "Options -e and -c are mutually exclusive."
+  | None | Some "-" -> !compile
   | Some "" ->
-      if   input = "-"
-      then abort "OCaml filename (for compilation) missing."
-      else Some (Filename.remove_extension input ^ ".ml")
+     (match input with
+        None | Some "-" -> abort "The target OCaml filename is missing."
+      | Some file -> Some (Filename.remove_extension file ^ ".ml"))
   | Some compile' ->
       if   Filename.check_suffix compile' ".ml"
       then !compile
-      else abort "Extension of the OCaml file is not .ml"
-;;
-
-match compile with
-    None -> ()
-| Some _ -> if !eval then abort "Options -e and -c are mutually exclusive."
-;;
-
-let out =
-  match !output with
-    None | Some "-" -> !output
-  | Some "" -> Some (if input = "-" then "-"
-                    else Filename.remove_extension input ^ ".son")
-  | Some out' -> if   Filename.check_suffix out' ".son"
-                then !output
-                else abort "Extension of output is not .son."
-;;
-
-if out <> None && not !eval && compile = None then
-  abort "Option --eval or -c required to produce a Michelson file.";;
+      else abort "The extension of the target OCaml file is not .ml"
 
 (* Exporting remaining options as non-mutable values *)
 
 let eval      = !eval
-and debug     = !debug
+and verbose   = !verbose
 and libs      = !libs
 and raw_edits = !raw_edits
-;;
 
-if Utils.String.Set.mem "cmdline" debug then
-begin
-  Printf.printf "\nEXPORTED COMMAND LINE\n";
-  Printf.printf "input     = \"%s\"\n" input;
-  Printf.printf "out       = \"%s\"\n" (string_of quote out);
-  Printf.printf "compile   = %s\n"     (string_of quote compile);
-  Printf.printf "eval      = %B\n"     eval;
-  Printf.printf "raw_edits = %B\n"     raw_edits;
-  Printf.printf "debug     = %s\n"     debug_str;
-  Printf.printf "I         = %s\n"     (string_of_path libs)
-end
-;;
+let () =
+  if Utils.String.Set.mem "cmdline" verbose then
+    begin
+      printf "\nEXPORTED COMMAND LINE\n";
+      printf "input     = %s\n" (string_of quote input);
+      printf "compile   = %s\n" (string_of quote compile);
+      printf "eval      = %B\n" eval;
+      printf "raw_edits = %B\n" raw_edits;
+      printf "verbose   = %s\n" verb_str;
+      printf "I         = %s\n" (string_of_path libs)
+    end

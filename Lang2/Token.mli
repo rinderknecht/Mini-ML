@@ -4,7 +4,6 @@ type t =
   (* Symbols *)
 
   ARROW    (* "->" *)
-| BAR      (* "|"  *)
 | CONS     (* "::" *)
 | CAT      (* "^"  *)
 
@@ -12,8 +11,8 @@ type t =
 
 | MINUS    (* "-" *)
 | PLUS     (* "+" *)
-| DIV      (* "/" *)
-| MULT     (* "*" *)
+| SLASH    (* "/" *)
+| TIMES    (* "*" *)
 
   (* Compounds *)
 
@@ -21,11 +20,15 @@ type t =
 | RPAR     (* ")" *)
 | LBRACK   (* "[" *)
 | RBRACK   (* "]" *)
+| LBRACE   (* "{" *)
+| RBRACE   (* "}" *)
 
   (* Separators *)
 
 | COMMA    (* "," *)
 | SEMI     (* ";" *)
+| VBAR     (* "|" *)
+| COLON    (* ":" *)
 
   (* Wildcard *)
 
@@ -45,13 +48,15 @@ type t =
 
   (* Identifiers, labels, numbers and strings *)
 
-| Ident of string
-| Int   of Z.t
-| Str   of string
+| Ident  of string
+| Constr of string
+| Int    of Z.t
+| Str    of string
 
   (* Keywords *)
 
 | And
+| Begin
 | Else
 | End
 | False
@@ -59,12 +64,17 @@ type t =
 | If
 | In
 | Let
+| List
+| Map
 | Match
 | Mod
 | Not
+| Of
 | Rec
+| Set
 | Then
 | True
+| Type
 | With
 
   (* Virtual tokens *)

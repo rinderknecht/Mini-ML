@@ -4,19 +4,22 @@ type t =
   (* Symbols *)
 
   ARROW
-| BAR
 | CONS
 | CAT
 | MINUS
 | PLUS
-| DIV
-| MULT
+| SLASH
+| TIMES
 | LPAR
 | RPAR
 | LBRACK
 | RBRACK
+| LBRACE
+| RBRACE
 | COMMA
 | SEMI
+| VBAR
+| COLON
 | WILD
 | EQ
 | NE
@@ -29,13 +32,15 @@ type t =
 
 (* Identifiers, numbers and strings *)
 
-| Ident of string
-| Int   of Z.t
-| Str   of string
+| Ident  of string
+| Constr of string
+| Int    of Z.t
+| Str    of string
 
 (* Some keywords of OCaml *)
 
 | And
+| Begin
 | Else
 | End
 | False
@@ -43,35 +48,43 @@ type t =
 | If
 | In
 | Let
+| List
+| Map
 | Match
 | Mod
 | Not
+| Of
 | Rec
+| Set
 | Then
 | True
+| Type
 | With
 
 (* Virtual tokens *)
 
-| EOF (* End of file       *)
+| EOF (* End of file *)
 
 type token = t
 
 let to_string = function
   ARROW    -> "->"
-| BAR      -> "|"
 | CONS     -> "::"
 | CAT      -> "^"
 | MINUS    -> "-"
 | PLUS     -> "+"
-| DIV      -> "/"
-| MULT     -> "*"
+| SLASH    -> "/"
+| TIMES    -> "*"
 | LPAR     -> "("
 | RPAR     -> ")"
 | LBRACK   -> "["
 | RBRACK   -> "]"
+| LBRACE   -> "{"
+| RBRACE   -> "}"
 | COMMA    -> ","
 | SEMI     -> ";"
+| VBAR     -> "|"
+| COLON    -> ":"
 | WILD     -> "_"
 | EQ       -> "="
 | NE       -> "<>"
@@ -82,9 +95,11 @@ let to_string = function
 | BOOL_OR  -> "||"
 | BOOL_AND -> "&&"
 | Ident id -> Printf.sprintf "Ident %s"   id
+| Constr id -> Printf.sprintf "Constr %s" id
 | Int n    -> Printf.sprintf "Int %s"     (Z.to_string n)
 | Str n    -> Printf.sprintf "Str \"%s\"" n
 | And      -> "and"
+| Begin    -> "begin"
 | Else     -> "else"
 | End      -> "end"
 | False    -> "false"
@@ -92,11 +107,16 @@ let to_string = function
 | If       -> "if"
 | In       -> "in"
 | Let      -> "let"
+| List     -> "list"
+| Map      -> "map"
 | Match    -> "match"
 | Mod      -> "mod"
 | Not      -> "not"
+| Of       -> "of"
 | Rec      -> "rec"
+| Set      -> "set"
 | Then     -> "then"
 | True     -> "true"
+| Type     -> "type"
 | With     -> "with"
 | EOF      -> "EOF"
