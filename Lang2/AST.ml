@@ -1,3 +1,5 @@
+[@@@warning "-30-40-42"]
+
 (* Abstract Syntax Tree (AST) for Mini-ML *)
 
 type 'a reg = 'a Region.reg
@@ -93,13 +95,21 @@ type 'a ssv = ('a, semi) Utils.sepseq
 
 (* Parentheses *)
 
-type 'a par = lpar * 'a * rpar
+type 'a par = {
+  lpar   : lpar;
+  inside : 'a;
+  rpar   : rpar
+}
 
 type the_unit = lpar * rpar
 
 (* Brackets compounds *)
 
-type 'a brackets = lbra * 'a * rbra
+type 'a brackets = {
+  lbra   : lbra;
+  inside : 'a;
+  rbra   : rbra
+}
 
 (* The Abstract Syntax Tree *)
 
@@ -117,13 +127,21 @@ and statement =
 
 and let_bindings = (let_binding, kwd_and) Utils.nsepseq
 
-and let_binding = pattern * eq * expr
+and let_binding = {
+  pattern : pattern;
+  eq      : eq;
+  let_rhs : expr
+}
 
 (* Recursive values *)
 
 and let_rec_bindings = (let_rec_binding,  kwd_and) Utils.nsepseq
 
-and let_rec_binding  = variable * eq * fun_expr
+and let_rec_binding  = {
+  pattern     : variable;
+  eq          : eq;
+  let_rec_rhs : fun_expr
+}
 
 (* Recursive types *)
 
@@ -183,45 +201,45 @@ and pattern =
 | Ppar   of pattern par reg
 
 and expr =
-  LetExpr of let_expr reg       (* let [rec] p1 = e1 and p2 = e2 and ... in e *)
-| Fun     of fun_expr           (* fun x -> e                                 *)
-| If      of conditional reg    (* if e1 then e2 else e3                      *)
-| Tuple   of expr csv reg       (* e1, e2, ...                                *)
-| Match   of match_expr reg     (* p1 -> e1 | p2 -> e2 | ...                  *)
+  LetExpr of let_expr reg      (* let [rec] p1 = e1 and p2 = e2 and ... in e *)
+| Fun     of fun_expr          (* fun x -> e                                 *)
+| If      of conditional reg   (* if e1 then e2 else e3                      *)
+| Tuple   of expr csv reg      (* e1, e2, ...                                *)
+| Match   of match_expr reg    (* p1 -> e1 | p2 -> e2 | ...                  *)
 
-| Cat     of (expr * cat * expr) reg                              (* e1  ^ e2 *)
-| Cons    of (expr * cons * expr) reg                             (* e1 :: e2 *)
+| Cat     of (expr * cat * expr) reg                             (* e1  ^ e2 *)
+| Cons    of (expr * cons * expr) reg                            (* e1 :: e2 *)
 
-| Or      of (expr * bool_or * expr) reg                          (* e1 || e2 *)
-| And     of (expr * bool_and * expr) reg                         (* e1 && e2 *)
+| Or      of (expr * bool_or * expr) reg                         (* e1 || e2 *)
+| And     of (expr * bool_and * expr) reg                        (* e1 && e2 *)
 
-| Lt      of (expr * lt * expr) reg                               (* e1  < e2 *)
-| LEq     of (expr * le * expr) reg                               (* e1 <= e2 *)
-| Gt      of (expr * gt * expr) reg                               (* e1  > e2 *)
-| GEq     of (expr * ge * expr) reg                               (* e1 >= e2 *)
-| NEq     of (expr * ne * expr) reg                               (* e1 <> e2 *)
-| Eq      of (expr * eq * expr) reg                               (* e1  = e2 *)
+| Lt      of (expr * lt * expr) reg                              (* e1  < e2 *)
+| LEq     of (expr * le * expr) reg                              (* e1 <= e2 *)
+| Gt      of (expr * gt * expr) reg                              (* e1  > e2 *)
+| GEq     of (expr * ge * expr) reg                              (* e1 >= e2 *)
+| NEq     of (expr * ne * expr) reg                              (* e1 <> e2 *)
+| Eq      of (expr * eq * expr) reg                              (* e1  = e2 *)
 
-| Add     of (expr * plus   * expr) reg                           (* e1  + e2 *)
-| Sub     of (expr * minus  * expr) reg                           (* e1  - e2 *)
+| Add     of (expr * plus   * expr) reg                          (* e1  + e2 *)
+| Sub     of (expr * minus  * expr) reg                          (* e1  - e2 *)
 
-| Mult    of (expr * mult    * expr) reg                         (* e1  *  e2 *)
-| Div     of (expr * div     * expr) reg                         (* e1  /  e2 *)
-| Mod     of (expr * kwd_mod * expr) reg                         (* e1 mod e2 *)
+| Mult    of (expr * mult    * expr) reg                        (* e1  *  e2 *)
+| Div     of (expr * div     * expr) reg                        (* e1  /  e2 *)
+| Mod     of (expr * kwd_mod * expr) reg                        (* e1 mod e2 *)
 
-| Neg     of (minus   * expr) reg                                    (*    -e *)
-| Not     of (kwd_not * expr) reg                                    (* not e *)
+| Neg     of (minus   * expr) reg                                   (*    -e *)
+| Not     of (kwd_not * expr) reg                                   (* not e *)
 
-| Call    of (expr * expr) reg                                         (* f e *)
+| Call    of (expr * expr) reg                                        (* f e *)
 
-| Int     of Z.t reg                                         (* 12345         *)
-| Var     of variable                                        (* x             *)
-| Str     of string reg                                      (* "foo"         *)
-| Unit    of the_unit reg                                    (* ()            *)
-| True    of kwd_true                                        (* true          *)
-| False   of kwd_false                                       (* false         *)
-| Par     of expr par reg                                    (* (e)           *)
-| List    of expr ssv brackets reg                           (* [e1; e2; ...] *)
+| Int     of Z.t reg                                        (* 12345         *)
+| Var     of variable                                       (* x             *)
+| Str     of string reg                                     (* "foo"         *)
+| Unit    of the_unit reg                                   (* ()            *)
+| True    of kwd_true                                       (* true          *)
+| False   of kwd_false                                      (* false         *)
+| Par     of expr par reg                                   (* (e)           *)
+| List    of expr ssv brackets reg                          (* [e1; e2; ...] *)
 | Extern  of extern
 | Constr  of constr
 
@@ -309,11 +327,11 @@ and let_bindings_to_string bindings =
     if acc = "" then str else sprintf "%s\nAnd %s" acc str
   in Utils.nsepseq_foldr apply bindings ""
 
-and let_binding_to_string (pattern, _, expr) =
-  sprintf "%s = %s" (pattern_to_string pattern) (expr_to_string expr)
+and let_binding_to_string {pattern; let_rhs; _} =
+  sprintf "%s = %s" (pattern_to_string pattern) (expr_to_string let_rhs)
 
-and let_rec_binding_to_string (var, _, expr) =
-  sprintf "%s = %s" var.value (fun_expr_to_string expr)
+and let_rec_binding_to_string {pattern=var; let_rec_rhs; _} =
+  sprintf "%s = %s" var.value (fun_expr_to_string let_rec_rhs)
 
 and type_decl_to_string (_,name,_,type_expr) =
   sprintf "Type %s = %s" name.Region.value
@@ -324,7 +342,7 @@ and type_expr_to_string = function (* TODO *)
 | TSum {value=variants; _} -> ""
 | TRecord record -> ""
 | TApp {value = type_constr, args; _} -> ""
-| TPar {value = _,type_expr,_; _} -> ""
+| TPar {value = {inside=type_expr;_}; _} -> ""
 | TAlias {value=var;_} -> ""
 | TFun _ -> ""
 
@@ -341,8 +359,8 @@ and expr_to_string = function
 |              False _ -> "false"
 |               True _ -> "true"
 |               Unit _ -> "()"
-|  Par {value=_,e,_;_} -> sprintf "(%s)" (expr_to_string e)
-| List {value=_,l,_;_} -> list_to_string expr_to_string l
+|  Par {value={inside=e;_}; _} -> sprintf "(%s)" (expr_to_string e)
+| List {value={inside=l;_}; _} -> list_to_string expr_to_string l
 |             Extern e -> extern_to_string e
 |    Neg {value=_,e;_} -> sprintf "-%s"    (expr_to_string e)
 |    Not {value=_,e;_} -> sprintf "not %s" (expr_to_string e)
@@ -407,9 +425,9 @@ and let_expr_to_string = function
 
 and pattern_to_string = function
   Ptuple {value;_}        -> tuple_to_string pattern_to_string value
-| Plist  {value=_,p,_;_}  -> list_to_string pattern_to_string p
+| Plist {value={inside=p;_}; _} -> list_to_string pattern_to_string p
 | Pvar {value;_}        -> value
-| Ppar {value=_,p,_;_}    -> sprintf "(%s)" (pattern_to_string p)
+| Ppar {value={inside=p;_};_} -> sprintf "(%s)" (pattern_to_string p)
 | Punit _             -> "()"
 | Pint {value;_}          -> Z.to_string value
 | Ptrue _             -> "true"
@@ -463,22 +481,22 @@ let region_of_expr = function
 (* Predicates *)
 
 let rec is_var = function
-  Par {value=_,e,_;_} -> is_var e
+  Par {value={inside=e;_};_} -> is_var e
     |           Var _ -> true
 |                   _ -> false
 
 let rec is_call = function
-  Par {value=_,e,_;_} -> is_call e
+  Par {value={inside=e;_};_} -> is_call e
 |              Call _ -> true
 |                   _ -> false
 
 let rec is_fun = function
-  Par {value=_,e,_;_} -> is_fun e
+  Par {value={inside=e;_};_} -> is_fun e
 |               Fun _ -> true
 |                   _ -> false
 
 let rec rm_par = function
-  Par {value=_,e,_;_} -> rm_par e
+  Par {value={inside=e;_};_} -> rm_par e
 |                   e -> e
 
 (* Rewriting let-expressions and fun-expressions, with some optimisations *)
@@ -494,7 +512,7 @@ let norm_fun region kwd_fun pattern eq expr =
       Pvar v -> kwd_fun, v, eq, expr
     |      _ -> let value     = Utils.gen_sym () in
                 let fresh    = Region.{region=Region.ghost; value} in
-                let bindings = (pattern, eq, Var fresh), [] in
+                let bindings = {pattern; eq; let_rhs = Var fresh}, [] in
                 let let_in   = LetIn (ghost_let, bindings, ghost_in, expr) in
                 let expr     = LetExpr Region.{region=Region.ghost; value=let_in}
     in kwd_fun, fresh, ghost_arrow, expr
@@ -527,7 +545,7 @@ let rec unparse' = function
   Fun {value=_,var,arrow,expr; _} ->
     if var.region#is_ghost then
       match expr with
-        LetExpr {value=LetIn (_,((pattern,eq,_),[]),_,expr); _} ->
+        LetExpr {value=LetIn (_,({pattern;eq;_},[]),_,expr); _} ->
           if eq#is_ghost then
             let patterns, sep, e = unparse' expr
             in Utils.nseq_cons pattern patterns, sep, e
@@ -584,10 +602,10 @@ and print_statement undo = function
 
 and print_let_bindings undo = print_nsepseq "and" (print_let_binding undo)
 
-and print_let_binding undo (pattern,eq,expr) =
+and print_let_binding undo {pattern; eq; let_rhs} =
   print_pattern pattern;
   if undo then
-    match unparse expr with
+    match unparse let_rhs with
       `Let (patterns, eq, e) ->
          Utils.nseq_iter print_pattern patterns;
          print_token eq "=";
@@ -599,18 +617,19 @@ and print_let_binding undo (pattern,eq,expr) =
          print_token arrow "->";
          print_expr undo e
     | `Idem _ ->
-         print_token eq "="; print_expr undo expr
-  else (print_token eq "="; print_expr undo expr)
+         print_token eq "="; print_expr undo let_rhs
+  else (print_token eq "="; print_expr undo let_rhs)
 
 and print_let_rec_bindings undo bindings =
   print_nsepseq "and" (print_let_rec_binding undo) bindings
 
-and print_let_rec_binding undo (var,eq,expr) =
-  print_let_binding undo (Pvar var, eq, Fun expr)
+and print_let_rec_binding undo {pattern=var; eq; let_rec_rhs} =
+  let binding = {pattern = Pvar var; eq; let_rhs = Fun let_rec_rhs}
+  in print_let_binding undo binding
 
 and print_pattern = function
   Ptuple {value=patterns;_} -> print_csv print_pattern patterns
-| Plist {value=lbra,patterns,rbra; _} ->
+| Plist {value={lbra; inside=patterns; rbra}; _} ->
     print_token lbra "[";
     print_ssv print_pattern patterns;
     print_token rbra "]"
@@ -626,7 +645,7 @@ and print_pattern = function
 | Pwild wild -> print_token wild "_"
 | Pcons {value=p1,c,p2; _} ->
     print_pattern p1; print_token c "::"; print_pattern p2
-| Ppar {value=lpar,p,rpar; _} ->
+| Ppar {value={lpar;inside=p;rpar}; _} ->
     print_token lpar "("; print_pattern p; print_token rpar ")"
 
 and print_expr undo = function
@@ -682,9 +701,9 @@ and print_expr undo = function
     print_token lpar "("; print_token rpar ")"
 | True kwd_true -> print_token kwd_true "true"
 | False kwd_false -> print_token kwd_false "false"
-| Par {value=lpar,e,rpar; _} ->
+| Par {value={lpar;inside=e;rpar}; _} ->
     print_token lpar "("; print_expr undo e; print_token rpar ")"
-| List {value=lbra,ssv,rbra; _} ->
+| List {value={lbra; inside=ssv; rbra}; _} ->
     print_token lbra "["; print_ssv (print_expr undo) ssv; print_token rbra "]"
 | Extern _ -> ()
 
@@ -751,22 +770,24 @@ and fv_statement state = function
 and fv_let_bindings (env, _ as state) bindings =
   Utils.nsepseq_foldl (fv_let_binding env) state bindings
 
-and fv_let_binding env (env',fv) (pattern,_,expr) =
+and fv_let_binding env (env',fv) {pattern; let_rhs=expr; _} =
   Vars.union (pattern_vars Vars.empty pattern) env', fv_expr env fv expr
 
 and fv_let_rec_bindings (env, fv) bindings =
   let env' =
-    Utils.nsepseq_foldl (fun a (v,_,_) -> Vars.add v.Region.value a) env bindings
+    Utils.nsepseq_foldl
+      (fun a ({pattern=v;_}: let_rec_binding) -> Vars.add v.Region.value a)
+      env bindings
   in env', Utils.nsepseq_foldl (fv_let_rec_binding env') fv bindings
 
-and fv_let_rec_binding env fv (_,_,expr) = fv_expr env fv (Fun expr)
+and fv_let_rec_binding env fv {let_rec_rhs=expr;_} = fv_expr env fv (Fun expr)
 
 and pattern_vars fv = function
   Ptuple {value; _}         -> Utils.nsepseq_foldl pattern_vars fv value
-| Plist {value=_,patterns,_; _} -> Utils.sepseq_foldl  pattern_vars fv patterns
+| Plist {value={inside=patterns;_}; _} -> Utils.sepseq_foldl  pattern_vars fv patterns
 | Pvar {value; _}                -> Vars.add value fv
 | Pcons {value=p1,_,p2; _}         -> pattern_vars (pattern_vars fv p1) p2
-| Ppar {value=_,pattern,_; _}      -> pattern_vars fv pattern
+| Ppar {value={inside=pattern;_}; _} -> pattern_vars fv pattern
 | Punit _ | Pwild _ | Pint _
 | Ptrue _ | Pfalse _ | Pstr _ -> fv
 
@@ -795,9 +816,9 @@ and fv_expr env fv = function
 |      Call {value=e1,e2; _} -> fv_expr env (fv_expr env fv e1) e2
 |           Neg {value=_,e; _}
 |           Not {value=_,e; _}
-|         Par {value=_,e,_; _} -> fv_expr env fv e
+|         Par {value={inside=e;_}; _} -> fv_expr env fv e
 |  Var v -> if Vars.mem v.value env then fv else FreeVars.add v fv
-|        List {value=_,l,_; _} -> Utils.sepseq_foldl (fv_expr env) fv l
+| List {value={inside=l;_}; _} -> Utils.sepseq_foldl (fv_expr env) fv l
 | Int _ | Str _ | Unit _ | True _ | False _ | Extern _ -> fv
 
 and fv_match_expr env fv (_, expr, _, cases) =

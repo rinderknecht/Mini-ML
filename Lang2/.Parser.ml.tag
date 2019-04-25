@@ -1,1 +1,1 @@
-ocamlc: -w -4
+ocamlc: -w -42-40

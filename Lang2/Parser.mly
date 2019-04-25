@@ -75,11 +75,20 @@ item_or_closing(Item,TERM):
     let item, (items, term, closing) = $1
     in `Some (item, items, term, closing)}
 
+terminated(Item,TERM): Item TERM { $1 $2 }
+
+sep_or_term_list(Item,TERM):
+  nsepseq(Item,TERM)          { $1 }
+| nseq(terminated(Item,TERM)) {
+        (*    let fist, others = $1 in*)
+     failwith "sep_or_term_list"
+  }
+
 (* Compound constructs *)
 
-par(X): sym(LPAR) X sym(RPAR) { $1,$2,$3 }
+par(X): sym(LPAR) X sym(RPAR) { {lpar=$1; inside=$2; rpar=$3} }
 
-brackets(X): sym(LBRACK) X sym(RBRACK) { $1,$2,$3 }
+brackets(X): sym(LBRACK) X sym(RBRACK) { {lbra=$1; inside=$2; rbra=$3} }
 
 (* Sequences
 
@@ -175,7 +184,7 @@ core_type:
 | reg(core_type type_constr {$1,$2}) {
     let arg, constr = $1.value in
     let lpar, rpar = Region.ghost, Region.ghost in
-    let arg = lpar, (arg,[]), rpar in
+    let arg = {lpar; inside=arg,[]; rpar} in
     TApp Region.{$1 with value = constr, arg}
   }
 | reg(type_tuple type_constr {$1,$2}) {
@@ -183,8 +192,8 @@ core_type:
     TApp Region.{$1 with value = constr, arg}
   }
 | reg(par(reg(cartesian))) {
-    let Region.{region; value=lpar,prod,rpar} = $1 in
-    TPar Region.{region; value=(lpar, TProd prod, rpar)} }
+    let Region.{region; value={lpar; inside=prod; rpar}} = $1 in
+    TPar Region.{region; value={lpar; inside = TProd prod; rpar}} }
 
 type_constr:
   type_name { $1 }
@@ -202,12 +211,16 @@ variant:
   constr kwd(Of) cartesian { {constr=$1; kwd_of=$2; product=$3} }
 
 record_type:
-  sym(LBRACE) series(reg(field_decl),sym(RBRACE)) {
+sym(LBRACE) series(reg(field_decl),sym(RBRACE)) {
+  failwith "record_type"
+(*
     let first, (others, terminator, closing) = $2
     in {opening  = $1;
         elements = Some (first, others);
         terminator;
-        closing} }
+        closing}
+ *)
+}
 
 field_decl:
   field_name sym(COLON) type_expr {
@@ -219,8 +232,11 @@ let_rec_bindings:
   nsepseq(let_rec_binding, kwd(And))                                     { $1 }
 
 let_rec_binding:
-  ident nseq(pattern) sym(EQ) expr          { $1, Region.ghost, norm $2 $3 $4 }
-| ident               sym(EQ) fun_expr      { $1,           $2,            $3 }
+  ident nseq(pattern) sym(EQ) expr {
+    {pattern = $1; eq = Region.ghost; let_rec_rhs = norm $2 $3 $4}
+  }
+| ident sym(EQ) fun_expr(expr) {
+    {pattern = $1; eq = $2; let_rec_rhs = $3}}
 
 (* Non-recursive definitions *)
 
@@ -228,9 +244,12 @@ let_bindings:
   nsepseq(let_binding, kwd(And))                                         { $1 }
 
 let_binding:
-  ident nseq(pattern) sym(EQ) expr           { let expr = Fun (norm $2 $3 $4)
-                                               in Pvar $1, Region.ghost, expr }
-| let_lhs             sym(EQ) expr           {                       $1,$2,$3 }
+  ident nseq(pattern) sym(EQ) expr {
+    let let_rhs = Fun (norm $2 $3 $4) in
+    {pattern = Pvar $1; eq = Region.ghost; let_rhs}
+  }
+| let_lhs sym(EQ) expr {
+    {pattern=$1; eq=$2; let_rhs=$3} }
 
 (* Patterns *)
 
@@ -265,38 +284,50 @@ pattern:
 | common_pattern                                                    {      $1 }
 
 (* Expressions *)
+(*
+seq_expr:
+  expr (* TODO *)
+ *)
 
 expr:
-  reg(let_expr)                                                  { LetExpr $1 }
-| reg(csv(disj_expr))                                            {   Tuple $1 }
-| reg(conditional)                                               {      If $1 }
-| fun_expr                                                       {     Fun $1 }
+  common_expr(expr)                                              {         $1 }
 | reg(match_expr)                                                {   Match $1 }
+
+common_expr(expr):
+  reg(let_expr(expr))                                            { LetExpr $1 }
+| reg(csv(disj_expr))                                            {   Tuple $1 }
+| reg(conditional(expr))                                         {      If $1 }
+| fun_expr(expr)                                                 {     Fun $1 }
 | disj_expr                                                      {         $1 }
 
 match_expr:
   kwd(Match) expr kwd(With) bsv(case)                           { $1,$2,$3,$4 }
 
 case:
-  let_lhs sym(ARROW) expr                                          { $1,$2,$3 }
+  let_lhs sym(ARROW) match_closed_expr                             { $1,$2,$3 }
 
-let_expr:
+match_closed_expr:
+  common_expr(match_closed_expr)                                         { $1 }
+
+let_expr(expr):
   kwd(Let)          let_bindings     kwd(In) expr {    LetIn ($1,   $2,$3,$4) }
 | kwd(Let) kwd(Rec) let_rec_bindings kwd(In) expr { LetRecIn ($1,$2,$3,$4,$5) }
 
-conditional:
+conditional(expr):
   kwd(If) expr kwd(Then) expr kwd(Else) expr {
     $1,$2,$3,$4,$5,$6
   }
+(* TODO *)
+     (*
 | kwd(If) expr kwd(Then) expr {
     let else_expr = Unit Region.{region=ghost; value=ghost, ghost}
-    in $1, $2, $3, $4, Region.ghost, else_expr
-  }
+    in $1, $2, $3, $4, Region.ghost, else_expr }
+      *)
 
-fun_expr:
+fun_expr(expr):
   reg(kwd(Fun) nseq(pattern) sym(ARROW) expr {$1,$2,$3,$4}) {
     let Region.{region; value = kwd_fun, patterns, arrow, expr} = $1
-    in norm ~reg:(region, kwd_fun) patterns arrow expr}
+    in norm ~reg:(region, kwd_fun) patterns arrow expr }
 
 disj_expr:
   reg(disj_expr sym(BOOL_OR) conj_expr {$1,$2,$3})                 {    Or $1 }
@@ -324,8 +355,8 @@ cons_expr:
 | add_expr                                                         {       $1 }
 
 add_expr:
-  reg(add_expr sym(PLUS)   mult_expr {$1,$2,$3})                   {   Add $1 }
-| reg(add_expr sym(MINUS)  mult_expr {$1,$2,$3})                   {   Sub $1 }
+  reg(add_expr sym(PLUS)  mult_expr {$1,$2,$3})                    {   Add $1 }
+| reg(add_expr sym(MINUS) mult_expr {$1,$2,$3})                    {   Sub $1 }
 | mult_expr                                                        {       $1 }
 
 mult_expr:
