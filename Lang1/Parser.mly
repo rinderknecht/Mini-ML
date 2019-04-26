@@ -132,44 +132,44 @@ let_rec_binding:
 (* Non-recursive definitions *)
 
 let_bindings:
-  nsepseq(let_binding, kwd(And))                                           { $1 }
+  nsepseq(let_binding, kwd(And))                                       { $1 }
 
 let_binding:
-  ident nseq(pattern) sym(EQ) expr             { let expr = Fun (norm $2 $3 $4)
-                                                 in Pvar $1, Region.ghost, expr }
-| let_lhs             sym(EQ) expr             {                       $1,$2,$3 }
+  ident nseq(pattern) sym(EQ) expr         { let expr = Fun (norm $2 $3 $4)
+                                             in Pvar $1, Region.ghost, expr }
+| let_lhs             sym(EQ) expr         {                       $1,$2,$3 }
 
 (* Patterns *)
 
 let_lhs:
-  reg(pattern sym(CONS) cons_pat {$1,$2,$3})                        {  Pcons $1 }
-| csv(pattern)                                                      { Ptuple $1 }
-| common_pattern                                                    {        $1 }
+  reg(pattern sym(CONS) cons_pat {$1,$2,$3})                    {  Pcons $1 }
+| csv(pattern)                                                  { Ptuple $1 }
+| common_pattern                                                {        $1 }
 
 common_pattern:
-  ident                                                             {   Pvar $1 }
-| sym(WILD)                                                         {  Pwild $1 }
-| unit                                                              {  Punit $1 }
-| reg(Int)                                                          {   Pint $1 }
-| kwd(True)                                                         {  Ptrue $1 }
-| kwd(False)                                                        { Pfalse $1 }
-| string                                                            {   Pstr $1 }
-| list__(cons_pat)                                                  {  Plist $1 }
-| par(ptuple)                                                       {   Ppar $1 }
+  ident                                                         {   Pvar $1 }
+| sym(WILD)                                                     {  Pwild $1 }
+| unit                                                          {  Punit $1 }
+| reg(Int)                                                      {   Pint $1 }
+| kwd(True)                                                     {  Ptrue $1 }
+| kwd(False)                                                    { Pfalse $1 }
+| string                                                        {   Pstr $1 }
+| list__(cons_pat)                                              {  Plist $1 }
+| par(ptuple)                                                   {   Ppar $1 }
 
 ptuple:
-  csv(cons_pat)                                                     { Ptuple $1 }
+  csv(cons_pat)                                                 { Ptuple $1 }
 
 unit:
-  reg(sym(LPAR) sym(RPAR) {$1,$2})                                         { $1 }
+  reg(sym(LPAR) sym(RPAR) {$1,$2})                                     { $1 }
 
 cons_pat:
-  reg(pattern sym(CONS) cons_pat {$1,$2,$3})                         { Pcons $1 }
-| pattern                                                            {       $1 }
+  reg(pattern sym(CONS) cons_pat {$1,$2,$3})                     { Pcons $1 }
+| pattern                                                        {       $1 }
 
 pattern:
-  par(cons_pat)                                                       { Ppar $1 }
-| common_pattern                                                      {      $1 }
+  par(cons_pat)                                                   { Ppar $1 }
+| common_pattern                                                  {      $1 }
 
 (* Expressions *)
 
@@ -200,15 +200,12 @@ if_closed_expr:
 | reg(if_then_else(if_closed_expr))                                { If $1 }
 
 match_expr(right_expr):
-  kwd(Match) expr kwd(With) cases kwd(Rec)                { $1,$2,$3,$4 }
+  kwd(Match) expr kwd(With) cases(right_expr) { $1,$2,$3, Utils.nsepseq_rev $4 }
 
-cases:
-  bsv(case(expr)) { $1 }
-(*cases(right_expr):
-  case(right_expr)                      { $1, [] }
-| case(expr) sym(BAR) cases(right_expr) {
-    let h,t = $3 in $1, ($2,h)::t }
- *)
+cases(right_expr):
+  case(right_expr) { $1, [] }
+| cases(expr) sym(BAR) case(right_expr) {
+    let h,t = $1 in $3, ($2,h)::t }
 
 case(right_expr):
   let_lhs sym(ARROW) right_expr                                  { $1,$2,$3 }
