@@ -176,11 +176,15 @@ pattern:
 expr:
   common_expr(expr)                                            {         $1 }
 | reg(conditional(expr))                                       {      If $1 }
+| reg(match_expr(expr_no_match))                               {   Match $1 }
+
+expr_no_match:
+  common_expr(expr_no_match)                                   {         $1 }
+| reg(conditional(expr_no_match))                              {      If $1 }
 
 common_expr(right_expr):
   reg(let_expr(right_expr))                                    { LetExpr $1 }
 | fun_expr(right_expr)                                         {     Fun $1 }
-| reg(match_expr(right_expr))                                  {   Match $1 }
 | csv(disj_expr)                                               {   Tuple $1 }
 | disj_expr                                                    {         $1 }
 
@@ -192,27 +196,31 @@ if_then(right_expr):
   kwd(If) expr kwd(Then) right_expr                  { IfThen ($1,$2,$3,$4) }
 
 if_then_else(right_expr):
-  kwd(If) expr kwd(Then) if_closed_expr kwd(Else) right_expr {
+  kwd(If) expr kwd(Then) closed_if kwd(Else) right_expr {
     IfThenElse ($1,$2,$3,$4,$5,$6) }
 
-if_closed_expr:
-  common_expr(if_closed_expr)                                      {    $1 }
-| reg(if_then_else(if_closed_expr))                                { If $1 }
+closed_if:
+  common_expr(closed_if)                                  {         $1 }
+| reg(if_then_else(closed_if))                            {      If $1 }
+| reg(match_expr(closed_if_no_match))                     {   Match $1 }
+
+closed_if_no_match:
+  common_expr(closed_if_no_match)                         {         $1 }
+| reg(if_then_else(closed_if_no_match))                   {      If $1 }
 
 match_expr(right_expr):
-  kwd(Match) expr kwd(With) cases(right_expr) { $1,$2,$3, Utils.nsepseq_rev $4 }
+  kwd(Match) expr kwd(With) cases(right_expr) {
+    $1,$2,$3, Utils.nsepseq_rev $4 }
 
 cases(right_expr):
-  case(right_expr) { $1, [] }
-| cases(expr) sym(BAR) case(right_expr) {
-    let h,t = $1 in $3, ($2,h)::t }
+  case(right_expr)                               {                 $1,        [] }
+| cases(expr_no_match) sym(BAR) case(right_expr) { let h,t = $1 in $3, ($2,h)::t }
 
 case(right_expr):
   let_lhs sym(ARROW) right_expr                                  { $1,$2,$3 }
 
 let_expr(right_expr):
-  kwd(Let) let_bindings kwd(In) right_expr {
-    LetIn ($1,$2,$3,$4) }
+  kwd(Let) let_bindings kwd(In) right_expr            { LetIn ($1,$2,$3,$4) }
 | kwd(Let) kwd(Rec) let_rec_bindings kwd(In) right_expr {
     LetRecIn ($1,$2,$3,$4,$5) }
 
