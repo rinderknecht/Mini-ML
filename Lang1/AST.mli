@@ -189,7 +189,9 @@ and let_expr =
 
 and fun_expr = (kwd_fun * var reg * arrow * expr) reg
 
-and conditional = kwd_if * expr * kwd_then * expr * kwd_else * expr
+and conditional =
+  IfThen     of kwd_if * expr * kwd_then * expr
+| IfThenElse of kwd_if * expr * kwd_then * expr * kwd_else * expr
 
 and extern =
   Cast   of cast_expr

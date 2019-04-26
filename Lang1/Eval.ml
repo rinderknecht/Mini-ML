@@ -328,16 +328,10 @@ and eval_expr state = function
       LetExpr (_,e) -> eval_let_expr state e
 |  Tuple components -> eval_tuple state components
 |       Match (_,e) -> eval_match state e
+|       If (_,cond) -> eval_cond state cond
 | Fun (r,(_,x,_,e)) ->
     state.State.thread,
     Value.(Clos (r, {param=x; body=e; env=state.State.env}))
-| If (_,(_, cond,_, if_true, _, otherwise)) ->
-    let thread, value = eval_expr state cond in
-    let eval = eval_expr State.{state with thread} in
-    (match value with
-       Value.Bool (_, true)  -> eval if_true
-     | Value.Bool (_, false) -> eval otherwise
-     | _ -> raise (Type_error (state, __LOC__)))
 | Cat (reg,(arg1,_,arg2)) ->
     let thread, v1 = eval_expr state arg1 in
     let thread, v2 = eval_expr State.{state with thread} arg2 in
@@ -465,6 +459,23 @@ and eval_expr state = function
 | Par (_,(_,e,_)) -> eval_expr state e
 |          List l -> eval_expr_list state l
 |        Extern e -> eval_external state e
+
+and eval_cond state = function
+  IfThenElse (_, cond,_, if_true, _, otherwise) ->
+    let thread, value = eval_expr state cond in
+    let eval = eval_expr State.{state with thread} in
+    (match value with
+       Value.Bool (_, true)  -> eval if_true
+     | Value.Bool (_, false) -> eval otherwise
+     | _ -> raise (Type_error (state, __LOC__)))
+| IfThen (_, cond,_, if_true) ->
+    let thread, value = eval_expr state cond in
+    let eval = eval_expr State.{state with thread} in
+    (match value with
+       Value.Bool (_, true)    -> eval if_true
+     | Value.Bool (reg, false) ->
+         state.State.thread, Value.Unit reg
+     | _ -> raise (Type_error (state, __LOC__)))
 
 and eval_match state (_, expr, _, cases) =
   let env = state.State.env in

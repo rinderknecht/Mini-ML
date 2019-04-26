@@ -182,8 +182,11 @@ and edit_let_expr expr =
     | LetRecIn (_, _, bindings, kwd_in, expr) ->
         edit_let_rec_bindings bindings, kwd_in, expr)
 
-and edit_conditional (_,cond,_,ifso,_,ifnot) =
-  edit_expr cond <@ edit_expr ifso <@ edit_expr ifnot
+and edit_conditional = function
+  IfThenElse (_,cond,_,ifso,_,ifnot) ->
+    edit_expr cond <@ edit_expr ifso <@ edit_expr ifnot
+| IfThen (_,cond,_,ifso) ->
+    edit_expr cond <@ edit_expr ifso
 
 and edit_components comp = nsepseq_foldr edit_expr comp
 

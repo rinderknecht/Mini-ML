@@ -127,7 +127,7 @@ let_rec_bindings:
 
 let_rec_binding:
   ident nseq(pattern) sym(EQ) expr            { $1, Region.ghost, norm $2 $3 $4 }
-| ident               sym(EQ) fun_expr        { $1,           $2,            $3 }
+| ident               sym(EQ) fun_expr(expr)  { $1,           $2,            $3 }
 
 (* Non-recursive definitions *)
 
@@ -174,28 +174,53 @@ pattern:
 (* Expressions *)
 
 expr:
-  reg(let_expr)                                                    { LetExpr $1 }
-| csv(disj_expr)                                                   {   Tuple $1 }
-| reg(conditional)                                                 {      If $1 }
-| fun_expr                                                         {     Fun $1 }
-| reg(match_expr)                                                  {   Match $1 }
-| disj_expr                                                        {         $1 }
+  common_expr(expr)                                            {         $1 }
+| reg(conditional(expr))                                       {      If $1 }
 
-match_expr:
-  kwd(Match) expr kwd(With) bsv(case)                             { $1,$2,$3,$4 }
+common_expr(right_expr):
+  reg(let_expr(right_expr))                                    { LetExpr $1 }
+| fun_expr(right_expr)                                         {     Fun $1 }
+| reg(match_expr(right_expr))                                  {   Match $1 }
+| csv(disj_expr)                                               {   Tuple $1 }
+| disj_expr                                                    {         $1 }
 
-case:
-  let_lhs sym(ARROW) expr                                            { $1,$2,$3 }
+conditional(right_expr):
+  if_then_else(right_expr)                                             { $1 }
+| if_then(right_expr)                                                  { $1 }
 
-let_expr:
-  kwd(Let)          let_bindings     kwd(In) expr   {    LetIn ($1,   $2,$3,$4) }
-| kwd(Let) kwd(Rec) let_rec_bindings kwd(In) expr   { LetRecIn ($1,$2,$3,$4,$5) }
+if_then(right_expr):
+  kwd(If) expr kwd(Then) right_expr                  { IfThen ($1,$2,$3,$4) }
 
-conditional:
-  kwd(If) expr kwd(Then) expr kwd(Else) expr                { $1,$2,$3,$4,$5,$6 }
+if_then_else(right_expr):
+  kwd(If) expr kwd(Then) if_closed_expr kwd(Else) right_expr {
+    IfThenElse ($1,$2,$3,$4,$5,$6) }
 
-fun_expr:
-  reg(kwd(Fun) nseq(pattern) sym(ARROW) expr {$1,$2,$3,$4}) {
+if_closed_expr:
+  common_expr(if_closed_expr)                                      {    $1 }
+| reg(if_then_else(if_closed_expr))                                { If $1 }
+
+match_expr(right_expr):
+  kwd(Match) expr kwd(With) cases kwd(Rec)                { $1,$2,$3,$4 }
+
+cases:
+  bsv(case(expr)) { $1 }
+(*cases(right_expr):
+  case(right_expr)                      { $1, [] }
+| case(expr) sym(BAR) cases(right_expr) {
+    let h,t = $3 in $1, ($2,h)::t }
+ *)
+
+case(right_expr):
+  let_lhs sym(ARROW) right_expr                                  { $1,$2,$3 }
+
+let_expr(right_expr):
+  kwd(Let) let_bindings kwd(In) right_expr {
+    LetIn ($1,$2,$3,$4) }
+| kwd(Let) kwd(Rec) let_rec_bindings kwd(In) right_expr {
+    LetRecIn ($1,$2,$3,$4,$5) }
+
+fun_expr(right_expr):
+  reg(kwd(Fun) nseq(pattern) sym(ARROW) right_expr {$1,$2,$3,$4}) {
     let reg, (kwd_fun, patterns, arrow, expr) = $1
     in norm ~reg:(reg, kwd_fun) patterns arrow expr
   }

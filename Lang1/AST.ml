@@ -177,7 +177,9 @@ and let_expr =
 
 and fun_expr = (kwd_fun * var reg * arrow * expr) reg
 
-and conditional = kwd_if * expr * kwd_then * expr * kwd_else * expr
+and conditional =
+  IfThen     of kwd_if * expr * kwd_then * expr
+| IfThenElse of kwd_if * expr * kwd_then * expr * kwd_else * expr
 
 and extern =
   Cast   of cast_expr
@@ -271,9 +273,7 @@ and expr_to_string = function
 |               Extern e -> extern_to_string e
 |          Neg (_,(_,e)) -> sprintf "-%s"    (expr_to_string e)
 |          Not (_,(_,e)) -> sprintf "not %s" (expr_to_string e)
-| If (_,(_,e,_,e1,_,e2)) ->
-    sprintf "If (%s, %s, %s)"
-      (expr_to_string e) (expr_to_string e1) (expr_to_string e2)
+|            If (_,cond) -> cond_to_string cond
 | Cat (_,(arg1,_,arg2)) ->
     sprintf "%s ^ %s" (expr_to_string arg1) (expr_to_string arg2)
 | Cons (_,(hd,_,tl)) ->
@@ -306,6 +306,14 @@ and expr_to_string = function
     sprintf "Mod (%s, %s)" (expr_to_string e1) (expr_to_string e2)
 | Call (_,(func,arg)) ->
     sprintf "Call (%s, %s)" (expr_to_string func) (expr_to_string arg)
+
+and cond_to_string = function
+  IfThenElse (_,e,_,e1,_,e2) ->
+    sprintf "If (%s, %s, %s)"
+      (expr_to_string e) (expr_to_string e1) (expr_to_string e2)
+| IfThen (_,e,_,e1) ->
+    sprintf "If (%s, %s)"
+      (expr_to_string e) (expr_to_string e1)
 
 and match_expr_to_string (_,expr,_,cases) =
   sprintf "Match (%s, %s)" (expr_to_string expr) (cases_to_string cases)
@@ -636,13 +644,23 @@ and print_fun_expr undo (kwd_fun, rvar, arrow, expr) =
   print_token arrow "->";
   print_expr undo expr
 
-and print_conditional undo (kwd_if, e1, kwd_then, e2, kwd_else, e3) =
-  print_token kwd_if "if";
-  print_expr undo e1;
-  print_token kwd_then "then";
-  print_expr undo e2;
-  print_token kwd_else "else";
-  print_expr undo e3
+and print_conditional undo = function
+  IfThenElse (kwd_if, e1, kwd_then, e2, kwd_else, e3) ->
+    print_token Region.ghost "(";
+    print_token kwd_if "if";
+    print_expr undo e1;
+    print_token kwd_then "then";
+    print_expr undo e2;
+    print_token kwd_else "else";
+    print_expr undo e3;
+    print_token Region.ghost ")"
+| IfThen (kwd_if, e1, kwd_then, e2) ->
+    print_token Region.ghost "(";
+    print_token kwd_if "if";
+    print_expr undo e1;
+    print_token kwd_then "then";
+    print_expr undo e2;
+    print_token Region.ghost ")"
 
 (* Variables (free and bound) *)
 
@@ -694,7 +712,7 @@ and fv_expr env fv = function
 |   Fun (_,(_,(_,v),_,e)) -> fv_expr (Vars.add v env) fv e
 |         Tuple (_,comps) -> nsepseq_foldl (fv_expr env) fv comps
 |             Match (_,e) -> fv_match_expr env fv e
-| If (_,(_,e1,_,e2,_,e3)) -> let f = fv_expr env in f (f (f fv e1) e2) e3
+|             If (_,cond) -> fv_cond env fv cond
 |       Cat (_,(e1,_,e2))
 |      Cons (_,(e1,_,e2))
 |        Or (_,(e1,_,e2))
@@ -717,6 +735,12 @@ and fv_expr env fv = function
 |          Var (_,x as v) -> if Vars.mem x env then fv else FreeVars.add v fv
 |        List (_,(_,l,_)) -> sepseq_foldl (fv_expr env) fv l
 | Int _ | Str _ | Unit _ | True _ | False _ | Extern _ -> fv
+
+and fv_cond env fv = function
+  IfThenElse (_,e1,_,e2,_,e3) ->
+    let f = fv_expr env in f (f (f fv e1) e2) e3
+| IfThen (_,e1,_,e2) ->
+    let f = fv_expr env in f (f fv e1) e2
 
 and fv_match_expr env fv (_, expr, _, cases) =
   fv_cases env (fv_expr env fv expr) cases
