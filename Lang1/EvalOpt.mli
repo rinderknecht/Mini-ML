@@ -14,11 +14,20 @@ val input : string option
    nothing is done with the source. Note: if [compile] is [Some "-"],
    the compiled code is sent to standard output. *)
 
-val eval      : bool
-val compile   : string option
+val eval    : bool
+val compile : string option
 
-(*  TODO *)
+(* The value [libs] is the list of file paths for the generated OCaml
+   code to find libraries. See command-line option `-I'. *)
 
-val libs      : string list
-val verbose   : Utils.String.Set.t
+val libs : string list
+
+(* The value [verbose] is the set of pipeline stages that are
+   traced. See command-line option `--verbose'. *)
+
+val verbose : Utils.String.Set.t
+
+(* The value [raw_edits] is [true] if we want the transpiler to not
+   optimise the edits. See command-line option `--raw-edits'. *)
+
 val raw_edits : bool
