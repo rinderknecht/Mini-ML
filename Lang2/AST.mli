@@ -124,7 +124,7 @@ type 'a brackets = {
 
 (* The Abstract Syntax Tree (finally) *)
 
-type t  = statement list * eof
+type t = statement list * eof
 
 and ast = t
 
@@ -219,7 +219,7 @@ and expr =
   (*  Seq     of expr ssv reg*)
 | LetExpr of let_expr reg      (* let [rec] p1 = e1 and p2 = e2 and ... in e *)
 | Fun     of fun_expr          (* fun x -> e                                 *)
-| If      of conditional reg   (* if e1 then e2 else e3                      *)
+| If      of conditional     (* if e1 then e2 else e3                      *)
 | Tuple   of expr csv reg      (* e1, e2, ...                                *)
 | Match   of match_expr reg    (* p1 -> e1 | p2 -> e2 | ...                  *)
 
@@ -269,7 +269,9 @@ and let_expr =
 
 and fun_expr = (kwd_fun * variable * arrow * expr) reg
 
-and conditional = kwd_if * expr * kwd_then * expr * kwd_else * expr
+and conditional =
+  IfThen     of (kwd_if * expr * kwd_then * expr) reg
+| IfThenElse of (kwd_if * expr * kwd_then * expr * kwd_else * expr) reg
 
 and extern =
   Cast   of cast_expr

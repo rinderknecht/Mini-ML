@@ -14,7 +14,7 @@
 %token RBRACK
 
 %token ARROW
-%token BAR
+%token VBAR
 %token CONS
 %token CAT
 

@@ -145,7 +145,7 @@ rule scan = parse
 | "->" { Token.ARROW    }
 | "::" { Token.CONS     }
 | "^"  { Token.CAT      }
-| "|"  { Token.BAR      }
+| "|"  { Token.VBAR     }
 
 | "="  { Token.EQ       }
 | "<>" { Token.NE       }

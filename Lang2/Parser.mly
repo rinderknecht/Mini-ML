@@ -47,42 +47,22 @@ constr : reg(Constr) { $1 }
 string : reg(Str)    { $1 }
 eof    : oreg(EOF)   { $1 }
 
-(* The rule [series(Item,TERM)] parses a non-empty list of [Item]
-   separated by semicolons and optionally terminated by a semicolon,
-   then the terminal TERM. *)
+(* The rule [sep_or_term(item,sep)] ("separated or terminated list")
+   parses a non-empty list of items separated by [sep], and optionally
+   terminated by [sep]. *)
 
-(* TODO: Try technique by Pottier in Gagallium blog post. *)
-
-series(Item,TERM):
-  Item after_item(Item,TERM) { $1,$2 }
-
-after_item(Item,TERM):
-  sym(SEMI) item_or_closing(Item,TERM) {
-    match $2 with
-      `Some (item, items, term, closing) ->
-        ($1, item)::items, term, closing
-    | `Closing closing ->
-        [], Some $1, closing
+sep_or_term_list(item,sep):
+  nsepseq(item,sep) {
+    $1, None
   }
-| TERM {
-   [], None, $1}
-
-item_or_closing(Item,TERM):
-  TERM {
-   `Closing $1
-  }
-| series(Item,TERM) {
-    let item, (items, term, closing) = $1
-    in `Some (item, items, term, closing)}
-
-terminated(Item,TERM): Item TERM { $1 $2 }
-
-sep_or_term_list(Item,TERM):
-  nsepseq(Item,TERM)          { $1 }
-| nseq(terminated(Item,TERM)) {
-        (*    let fist, others = $1 in*)
-     failwith "sep_or_term_list"
-  }
+| nseq(item sep {$1,$2}) {
+    let (first,sep), tail = $1 in
+    let rec trans (seq, prev_sep as acc) = function
+      [] -> acc
+    | (item,next_sep)::others ->
+        trans ((prev_sep,item)::seq, next_sep) others in
+    let list, term = trans ([],sep) tail
+    in (first, List.rev list), Some term }
 
 (* Compound constructs *)
 
@@ -134,7 +114,7 @@ sepseq(X,Sep):
 %inline type_name  : ident { $1 }
 %inline field_name : ident { $1 }
 
-(* Non-empty comma-separated values *)
+(* Non-empty comma-separated values (at least two values) *)
 
 csv(X):
   X sym(COMMA) nsepseq(X,sym(COMMA)) { let h,t = $3 in $1,($2,h)::t }
@@ -152,30 +132,32 @@ list_of(X):
 (* Main *)
 
 program:
-  seq(statement) eof                                                  { $1,$2 }
+  seq(statement) eof                                          { $1,$2 }
 
 statement:
-  reg(kwd(Let)          let_bindings     {$1,$2})               {      Let $1 }
-| reg(kwd(Let) kwd(Rec) let_rec_bindings {$1,$2,$3})            {   LetRec $1 }
-| reg(type_decl)                                                { TypeDecl $1 }
+  reg(kwd(Let)          let_bindings     {$1,$2})       {      Let $1 }
+| reg(kwd(Let) kwd(Rec) let_rec_bindings {$1,$2,$3})    {   LetRec $1 }
+| reg(type_decl)                                        { TypeDecl $1 }
 
 (* Type declarations *)
 
 type_decl:
-  kwd(Type) type_name sym(EQ) type_expr                         { $1,$2,$3,$4 }
+  kwd(Type) type_name sym(EQ) type_expr                 { $1,$2,$3,$4 }
 
 type_expr:
-  reg(cartesian)                                                 {   TProd $1 }
-| reg(sum_type)                                                  {    TSum $1 }
-| reg(record_type)                                               { TRecord $1 }
+  reg(cartesian)                                         {   TProd $1 }
+| reg(sum_type)                                          {    TSum $1 }
+| reg(record_type)                                       { TRecord $1 }
 
 cartesian:
-  nsepseq(fun_type,sym(TIMES))                                           { $1 }
+  nsepseq(fun_type,sym(TIMES))                                   { $1 }
 
 fun_type:
-  core_type                                                              { $1 }
-| reg(core_type sym(ARROW) fun_type { {domain=$1; arrow=$2; range=$3} }) {
-    TFun $1 }
+  core_type                                                 {      $1 }
+| reg(arrow_type)                                           { TFun $1 }
+
+arrow_type:
+  core_type sym(ARROW) fun_type     { {domain=$1; arrow=$2; range=$3} }
 
 core_type:
   type_name {
@@ -211,16 +193,9 @@ variant:
   constr kwd(Of) cartesian { {constr=$1; kwd_of=$2; product=$3} }
 
 record_type:
-sym(LBRACE) series(reg(field_decl),sym(RBRACE)) {
-  failwith "record_type"
-(*
-    let first, (others, terminator, closing) = $2
-    in {opening  = $1;
-        elements = Some (first, others);
-        terminator;
-        closing}
- *)
-}
+  sym(LBRACE) sep_or_term_list(reg(field_decl),sym(SEMI)) sym(RBRACE) {
+    failwith "record_type" (* TODO *)
+  }
 
 field_decl:
   field_name sym(COLON) type_expr {
@@ -229,7 +204,7 @@ field_decl:
 (* Recursive definitions *)
 
 let_rec_bindings:
-  nsepseq(let_rec_binding, kwd(And))                                     { $1 }
+  nsepseq(let_rec_binding, kwd(And)) { $1 }
 
 let_rec_binding:
   ident nseq(pattern) sym(EQ) expr {
@@ -241,7 +216,7 @@ let_rec_binding:
 (* Non-recursive definitions *)
 
 let_bindings:
-  nsepseq(let_binding, kwd(And))                                         { $1 }
+  nsepseq(let_binding, kwd(And)) { $1 }
 
 let_binding:
   ident nseq(pattern) sym(EQ) expr {
@@ -254,133 +229,152 @@ let_binding:
 (* Patterns *)
 
 let_lhs:
-  reg(pattern sym(CONS) cons_pat {$1,$2,$3})                      {  Pcons $1 }
-| reg(csv(pattern))                                               { Ptuple $1 }
-| common_pattern                                                  {        $1 }
+  reg(pattern sym(CONS) cons_pat {$1,$2,$3})              {  Pcons $1 }
+| reg(csv(pattern))                                       { Ptuple $1 }
+| base_pattern                                          {        $1 }
 
-common_pattern:
-  ident                                                           {   Pvar $1 }
-| sym(WILD)                                                       {  Pwild $1 }
-| unit                                                            {  Punit $1 }
-| reg(Int)                                                        {   Pint $1 }
-| kwd(True)                                                       {  Ptrue $1 }
-| kwd(False)                                                      { Pfalse $1 }
-| string                                                          {   Pstr $1 }
-| list_of(cons_pat)                                               {  Plist $1 }
-| reg(par(ptuple))                                                {   Ppar $1 }
+base_pattern:
+  ident                                                   {   Pvar $1 }
+| sym(WILD)                                               {  Pwild $1 }
+| unit                                                    {  Punit $1 }
+| reg(Int)                                                {   Pint $1 }
+| kwd(True)                                               {  Ptrue $1 }
+| kwd(False)                                              { Pfalse $1 }
+| string                                                  {   Pstr $1 }
+| list_of(cons_pat)                                       {  Plist $1 }
+| reg(par(ptuple))                                        {   Ppar $1 }
 
 ptuple:
-  reg(csv(cons_pat))                                              { Ptuple $1 }
+  reg(csv(cons_pat))                                      { Ptuple $1 }
 
 unit:
-  reg(sym(LPAR) sym(RPAR) {$1,$2})                                       { $1 }
+  reg(sym(LPAR) sym(RPAR) {$1,$2})                               { $1 }
 
 cons_pat:
-  reg(pattern sym(CONS) cons_pat {$1,$2,$3})                       { Pcons $1 }
-| pattern                                                          {       $1 }
+  reg(pattern sym(CONS) cons_pat {$1,$2,$3})               { Pcons $1 }
+| pattern                                                  {       $1 }
 
 pattern:
-  reg(par(cons_pat))                                                { Ppar $1 }
-| common_pattern                                                    {      $1 }
+  reg(par(cons_pat))                                        { Ppar $1 }
+| base_pattern                                            {      $1 }
 
 (* Expressions *)
-(*
-seq_expr:
-  expr (* TODO *)
- *)
 
 expr:
-  common_expr(expr)                                              {         $1 }
-| reg(match_expr)                                                {   Match $1 }
+  base_cond__open(expr)                                    {       $1 }
+| match_expr(base_cond)                                    { Match $1 }
 
-common_expr(expr):
-  reg(let_expr(expr))                                            { LetExpr $1 }
-| reg(csv(disj_expr))                                            {   Tuple $1 }
-| reg(conditional(expr))                                         {      If $1 }
-| fun_expr(expr)                                                 {     Fun $1 }
-| disj_expr                                                      {         $1 }
+base_cond__open(x):
+  base_expr(x)
+| conditional(x)                                                 { $1 }
 
-match_expr:
-  kwd(Match) expr kwd(With) bsv(case)                           { $1,$2,$3,$4 }
+base_cond:
+  base_cond__open(base_cond)                                     { $1 }
 
-case:
-  let_lhs sym(ARROW) match_closed_expr                             { $1,$2,$3 }
+base_expr(right_expr):
+  reg(let_expr(right_expr))                              { LetExpr $1 }
+| fun_expr(right_expr)                                   {     Fun $1 }
+| reg(csv(disj_expr))                                    {   Tuple $1 }
+| disj_expr                                              {         $1 }
 
-match_closed_expr:
-  common_expr(match_closed_expr)                                         { $1 }
+conditional(right_expr):
+  if_then_else(right_expr)
+| if_then(right_expr)                                    {      If $1 }
 
-let_expr(expr):
-  kwd(Let)          let_bindings     kwd(In) expr {    LetIn ($1,   $2,$3,$4) }
-| kwd(Let) kwd(Rec) let_rec_bindings kwd(In) expr { LetRecIn ($1,$2,$3,$4,$5) }
+if_then(right_expr):
+  reg(kwd(If) expr kwd(Then) right_expr {$1,$2,$3,$4})   {  IfThen $1 }
 
-conditional(expr):
-  kwd(If) expr kwd(Then) expr kwd(Else) expr {
-    $1,$2,$3,$4,$5,$6
+if_then_else(right_expr):
+  reg(kwd(If) expr kwd(Then) closed_if kwd(Else) right_expr {
+    $1,$2,$3,$4,$5,$6 })                              { IfThenElse $1 }
+
+base_if_then_else__open(x):
+  base_expr(x)                                             {       $1 }
+| if_then_else(x)                                          {    If $1 }
+
+base_if_then_else:
+  base_if_then_else__open(base_if_then_else)               {       $1 }
+
+closed_if:
+  base_if_then_else__open(closed_if)                       {       $1 }
+| match_expr(base_if_then_else)                            { Match $1 }
+
+match_expr(right_expr):
+  reg(kwd(Match) expr kwd(With) cases(right_expr) {
+    $1,$2,$3, Utils.nsepseq_rev $4 })                            { $1 }
+
+cases(right_expr):
+  case(right_expr)                                           { $1, [] }
+| cases(base_cond) sym(VBAR) case(right_expr) {
+    let h,t = $1 in $3, ($2,h)::t }
+
+case(right_expr):
+  let_lhs sym(ARROW) right_expr                            { $1,$2,$3 }
+
+let_expr(right_expr):
+  kwd(Let) let_bindings kwd(In) right_expr {
+    LetIn ($1,$2,$3,$4)
   }
-(* TODO *)
-     (*
-| kwd(If) expr kwd(Then) expr {
-    let else_expr = Unit Region.{region=ghost; value=ghost, ghost}
-    in $1, $2, $3, $4, Region.ghost, else_expr }
-      *)
+| kwd(Let) kwd(Rec) let_rec_bindings kwd(In) right_expr {
+    LetRecIn ($1,$2,$3,$4,$5) }
 
-fun_expr(expr):
-  reg(kwd(Fun) nseq(pattern) sym(ARROW) expr {$1,$2,$3,$4}) {
+fun_expr(right_expr):
+  reg(kwd(Fun) nseq(pattern) sym(ARROW) right_expr {$1,$2,$3,$4}) {
     let Region.{region; value = kwd_fun, patterns, arrow, expr} = $1
     in norm ~reg:(region, kwd_fun) patterns arrow expr }
 
 disj_expr:
-  reg(disj_expr sym(BOOL_OR) conj_expr {$1,$2,$3})                 {    Or $1 }
-| conj_expr                                                        {       $1 }
+  reg(disj_expr sym(BOOL_OR) conj_expr {$1,$2,$3})         {    Or $1 }
+| conj_expr                                                {       $1 }
 
 conj_expr:
-  reg(conj_expr sym(BOOL_AND) comp_expr {$1,$2,$3})                {   And $1 }
-| comp_expr                                                        {       $1 }
+  reg(conj_expr sym(BOOL_AND) comp_expr {$1,$2,$3})        {   And $1 }
+| comp_expr                                                {       $1 }
 
 comp_expr:
-  reg(comp_expr sym(LT) cat_expr {$1,$2,$3})                       {    Lt $1 }
-| reg(comp_expr sym(LE) cat_expr {$1,$2,$3})                       {   LEq $1 }
-| reg(comp_expr sym(GT) cat_expr {$1,$2,$3})                       {    Gt $1 }
-| reg(comp_expr sym(GE) cat_expr {$1,$2,$3})                       {   GEq $1 }
-| reg(comp_expr sym(EQ) cat_expr {$1,$2,$3})                       {    Eq $1 }
-| reg(comp_expr sym(NE) cat_expr {$1,$2,$3})                       {   NEq $1 }
-| cat_expr                                                         {       $1 }
+  reg(comp_expr sym(LT) cat_expr {$1,$2,$3})               {    Lt $1 }
+| reg(comp_expr sym(LE) cat_expr {$1,$2,$3})               {   LEq $1 }
+| reg(comp_expr sym(GT) cat_expr {$1,$2,$3})               {    Gt $1 }
+| reg(comp_expr sym(GE) cat_expr {$1,$2,$3})               {   GEq $1 }
+| reg(comp_expr sym(EQ) cat_expr {$1,$2,$3})               {    Eq $1 }
+| reg(comp_expr sym(NE) cat_expr {$1,$2,$3})               {   NEq $1 }
+| cat_expr                                                 {       $1 }
 
 cat_expr:
-  reg(cons_expr sym(CAT) cat_expr {$1,$2,$3})                      {   Cat $1 }
-| cons_expr                                                        {       $1 }
+  reg(cons_expr sym(CAT) cat_expr {$1,$2,$3})              {   Cat $1 }
+| cons_expr                                                {       $1 }
 
 cons_expr:
-  reg(add_expr sym(CONS) cons_expr {$1,$2,$3})                     {  Cons $1 }
-| add_expr                                                         {       $1 }
+  reg(add_expr sym(CONS) cons_expr {$1,$2,$3})             {  Cons $1 }
+| add_expr                                                 {       $1 }
 
 add_expr:
-  reg(add_expr sym(PLUS)  mult_expr {$1,$2,$3})                    {   Add $1 }
-| reg(add_expr sym(MINUS) mult_expr {$1,$2,$3})                    {   Sub $1 }
-| mult_expr                                                        {       $1 }
+  reg(add_expr sym(PLUS)  mult_expr {$1,$2,$3})            {   Add $1 }
+| reg(add_expr sym(MINUS) mult_expr {$1,$2,$3})            {   Sub $1 }
+| mult_expr                                                {       $1 }
 
 mult_expr:
-  reg(mult_expr sym(TIMES) unary_expr {$1,$2,$3})                  {  Mult $1 }
-| reg(mult_expr sym(SLASH) unary_expr {$1,$2,$3})                  {   Div $1 }
-| reg(mult_expr kwd(Mod)   unary_expr {$1,$2,$3})                  {   Mod $1 }
-| unary_expr                                                       {       $1 }
+  reg(mult_expr sym(TIMES) unary_expr {$1,$2,$3})          {  Mult $1 }
+| reg(mult_expr sym(SLASH) unary_expr {$1,$2,$3})          {   Div $1 }
+| reg(mult_expr kwd(Mod)   unary_expr {$1,$2,$3})          {   Mod $1 }
+| unary_expr                                               {       $1 }
 
 unary_expr:
-  reg(sym(MINUS) core_expr {$1,$2})                                {   Neg $1 }
-| reg(kwd(Not)   core_expr {$1,$2})                                {   Not $1 }
-| call_expr                                                        {       $1 }
+  reg(sym(MINUS) core_expr {$1,$2})                        {   Neg $1 }
+| reg(kwd(Not)   core_expr {$1,$2})                        {   Not $1 }
+| call_expr                                                {       $1 }
 
 call_expr:
-  reg(call_expr core_expr {$1,$2})                                 {  Call $1 }
-| core_expr                                                        {       $1 }
+  reg(call_expr core_expr {$1,$2})                         {  Call $1 }
+| core_expr                                                {       $1 }
 
 core_expr:
-  reg(Int)                                                        {    Int $1 }
-| ident                                                           {    Var $1 }
-| string                                                          {    Str $1 }
-| unit                                                            {   Unit $1 }
-| kwd(False)                                                      {  False $1 }
-| kwd(True)                                                       {   True $1 }
-| list_of(expr)                                                   {   List $1 }
-| reg(par(expr))                                                  {    Par $1 }
-| constr                                                          { Constr $1 }
+  reg(Int)                                                 {    Int $1 }
+| ident                                                    {    Var $1 }
+| string                                                   {    Str $1 }
+| unit                                                     {   Unit $1 }
+| kwd(False)                                               {  False $1 }
+| kwd(True)                                                {   True $1 }
+| list_of(expr)                                            {   List $1 }
+| reg(par(expr))                                           {    Par $1 }
+| constr                                                   { Constr $1 }

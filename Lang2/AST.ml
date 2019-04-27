@@ -203,7 +203,7 @@ and pattern =
 and expr =
   LetExpr of let_expr reg      (* let [rec] p1 = e1 and p2 = e2 and ... in e *)
 | Fun     of fun_expr          (* fun x -> e                                 *)
-| If      of conditional reg   (* if e1 then e2 else e3                      *)
+| If      of conditional      (* if e1 then e2 else e3                      *)
 | Tuple   of expr csv reg      (* e1, e2, ...                                *)
 | Match   of match_expr reg    (* p1 -> e1 | p2 -> e2 | ...                  *)
 
@@ -253,7 +253,9 @@ and let_expr =
 
 and fun_expr = (kwd_fun * variable * arrow * expr) reg
 
-and conditional = kwd_if * expr * kwd_then * expr * kwd_else * expr
+and conditional =
+  IfThen     of (kwd_if * expr * kwd_then * expr) reg
+| IfThenElse of (kwd_if * expr * kwd_then * expr * kwd_else * expr) reg
 
 and extern =
   Cast   of cast_expr
@@ -364,9 +366,7 @@ and expr_to_string = function
 |             Extern e -> extern_to_string e
 |    Neg {value=_,e;_} -> sprintf "-%s"    (expr_to_string e)
 |    Not {value=_,e;_} -> sprintf "not %s" (expr_to_string e)
-| If {value=_,e,_,e1,_,e2;_} ->
-    sprintf "If (%s, %s, %s)"
-      (expr_to_string e) (expr_to_string e1) (expr_to_string e2)
+|              If cond -> cond_to_string cond
 | Cat {value=arg1,_,arg2;_} ->
     sprintf "%s ^ %s" (expr_to_string arg1) (expr_to_string arg2)
 | Cons {value=hd,_,tl;_} ->
@@ -399,6 +399,14 @@ and expr_to_string = function
     sprintf "Mod (%s, %s)" (expr_to_string e1) (expr_to_string e2)
 | Call {value=e1,e2;_} ->
     sprintf "Call (%s, %s)" (expr_to_string e1) (expr_to_string e2)
+
+and cond_to_string = function
+  IfThenElse {value=_,e,_,e1,_,e2; _} ->
+    sprintf "If (%s, %s, %s)"
+      (expr_to_string e) (expr_to_string e1) (expr_to_string e2)
+| IfThen {value=_,e,_,e1; _} ->
+    sprintf "If (%s, %s)"
+      (expr_to_string e) (expr_to_string e1)
 
 and match_expr_to_string (_,expr,_,cases) =
   sprintf "Match (%s, %s)" (expr_to_string expr) (cases_to_string cases)
@@ -466,7 +474,8 @@ let region_of_pattern = function
 | Pstr {region;_} | Pwild region | Pcons {region;_} | Ppar {region;_} -> region
 
 let region_of_expr = function
-  LetExpr {region;_} | Fun {region;_} | If {region;_} | Tuple {region;_}
+  LetExpr {region;_} | Fun {region;_}
+| If IfThen {region;_} | If IfThenElse {region; _} | Tuple {region;_}
 | Match {region;_} | Cat {region;_} | Cons {region;_} | Or {region;_}
 | And {region;_} | Lt {region;_} | LEq {region;_}
 | Gt {region;_} | GEq {region;_} | NEq {region;_} | Eq {region;_}
@@ -650,9 +659,9 @@ and print_pattern = function
 
 and print_expr undo = function
   LetExpr {value;_} -> print_let_expr undo value
-|   If {value;_} -> print_conditional undo value
-| Tuple {value;_} -> print_csv (print_expr undo) value
-|  Match {value;_} -> print_match_expr undo value
+|           If cond -> print_conditional undo cond
+|   Tuple {value;_} -> print_csv (print_expr undo) value
+|   Match {value;_} -> print_match_expr undo value
 | Fun {value=(kwd_fun,_,_,_) as f; _} as e ->
     if undo then
       let patterns, arrow, expr = unparse' e in
@@ -738,13 +747,24 @@ and print_fun_expr undo (kwd_fun, rvar, arrow, expr) =
   print_token arrow "->";
   print_expr undo expr
 
-and print_conditional undo (kwd_if, e1, kwd_then, e2, kwd_else, e3) =
-  print_token kwd_if "if";
-  print_expr undo e1;
-  print_token kwd_then "then";
-  print_expr undo e2;
-  print_token kwd_else "else";
-  print_expr undo e3
+and print_conditional undo = function
+  IfThenElse Region.{value=kwd_if, e1, kwd_then, e2, kwd_else, e3; _} ->
+    print_token Region.ghost "(";
+    print_token kwd_if "if";
+    print_expr undo e1;
+    print_token kwd_then "then";
+    print_expr undo e2;
+    print_token kwd_else "else";
+    print_expr undo e3;
+    print_token Region.ghost ")"
+| IfThen Region.{value=kwd_if, e1, kwd_then, e2; _} ->
+    print_token Region.ghost "(";
+    print_token kwd_if "if";
+    print_expr undo e1;
+    print_token kwd_then "then";
+    print_expr undo e2;
+    print_token Region.ghost ")"
+
 
 (* Variables (free and bound) *)
 
@@ -792,12 +812,10 @@ and pattern_vars fv = function
 | Ptrue _ | Pfalse _ | Pstr _ -> fv
 
 and fv_expr env fv = function
-      LetExpr {value;_} -> fv_let_expr (env, fv) value
+       LetExpr {value;_} -> fv_let_expr (env, fv) value
 | Fun {value=_,v,_,e; _} -> fv_expr (Vars.add v.value env) fv e
 |   Tuple {value; _} -> Utils.nsepseq_foldl (fv_expr env) fv value
-|   Match {value;_} -> fv_match_expr env fv value
-| If {value=_,e1,_,e2,_,e3; _} ->
-    let f = fv_expr env in f (f (f fv e1) e2) e3
+|            If cond -> fv_cond env fv cond
 |   Cat {value=e1,_,e2; _}
 |      Cons {value=e1,_,e2; _}
 |        Or {value=e1,_,e2; _}
@@ -820,6 +838,12 @@ and fv_expr env fv = function
 |  Var v -> if Vars.mem v.value env then fv else FreeVars.add v fv
 | List {value={inside=l;_}; _} -> Utils.sepseq_foldl (fv_expr env) fv l
 | Int _ | Str _ | Unit _ | True _ | False _ | Extern _ -> fv
+
+and fv_cond env fv = function
+  IfThenElse {value=_,e1,_,e2,_,e3; _} ->
+    let f = fv_expr env in f (f (f fv e1) e2) e3
+| IfThen {value=_,e1,_,e2; _} ->
+    let f = fv_expr env in f (f fv e1) e2
 
 and fv_match_expr env fv (_, expr, _, cases) =
   fv_cases env (fv_expr env fv expr) cases

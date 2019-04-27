@@ -4,7 +4,7 @@ type t =
   (* Symbols *)
 
   ARROW    (* "->" *)
-| BAR      (* "|"  *)
+| VBAR     (* "|"  *)
 | CONS     (* "::" *)
 | CAT      (* "^"  *)
 

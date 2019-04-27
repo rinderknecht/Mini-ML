@@ -106,7 +106,7 @@ csv(X):
 (* Non-empty bar-separated productions *)
 
 bsv(X):
-  nsepseq(X,sym(BAR)) { $1 }
+  nsepseq(X,sym(VBAR)) { $1 }
 
 (* Possibly empty semicolon-separated values between brackets *)
 
@@ -216,7 +216,7 @@ match_expr(right_expr):
 
 cases(right_expr):
   case(right_expr)                                           { $1, [] }
-| cases(expr_no_match) sym(BAR) case(right_expr) {
+| cases(expr_no_match) sym(VBAR) case(right_expr) {
     let h,t = $1 in $3, ($2,h)::t }
 
 case(right_expr):

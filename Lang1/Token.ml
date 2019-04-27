@@ -4,7 +4,7 @@ type t =
   (* Symbols *)
 
   ARROW
-| BAR
+| VBAR
 | CONS
 | CAT
 | MINUS
@@ -59,7 +59,7 @@ type token = t
 
 let to_string = function
   ARROW    -> "->"
-| BAR      -> "|"
+| VBAR     -> "|"
 | CONS     -> "::"
 | CAT      -> "^"
 | MINUS    -> "-"
