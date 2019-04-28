@@ -193,9 +193,13 @@ variant:
   constr kwd(Of) cartesian { {constr=$1; kwd_of=$2; product=$3} }
 
 record_type:
-  sym(LBRACE) sep_or_term_list(reg(field_decl),sym(SEMI)) sym(RBRACE) {
-    failwith "record_type" (* TODO *)
-  }
+  sym(LBRACE) sep_or_term_list(reg(field_decl),sym(SEMI))
+  sym(RBRACE) {
+    let elements, terminator = $2 in
+    {opening = $1;
+     elements = Some elements;
+     terminator;
+     closing = $3} }
 
 field_decl:
   field_name sym(COLON) type_expr {
@@ -208,10 +212,11 @@ let_rec_bindings:
 
 let_rec_binding:
   ident nseq(pattern) sym(EQ) expr {
-    {pattern = $1; eq = Region.ghost; let_rec_rhs = norm $2 $3 $4}
+    {pattern = $1; eq = Region.ghost;
+     let_rec_rhs = Fun (norm $2 $3 $4)}
   }
 | ident sym(EQ) fun_expr(expr) {
-    {pattern = $1; eq = $2; let_rec_rhs = $3}}
+    {pattern = $1; eq = $2; let_rec_rhs = $3} }
 
 (* Non-recursive definitions *)
 
@@ -231,7 +236,7 @@ let_binding:
 let_lhs:
   reg(pattern sym(CONS) cons_pat {$1,$2,$3})              {  Pcons $1 }
 | reg(csv(pattern))                                       { Ptuple $1 }
-| base_pattern                                          {        $1 }
+| base_pattern                                            {        $1 }
 
 base_pattern:
   ident                                                   {   Pvar $1 }
@@ -256,7 +261,7 @@ cons_pat:
 
 pattern:
   reg(par(cons_pat))                                        { Ppar $1 }
-| base_pattern                                            {      $1 }
+| base_pattern                                              {      $1 }
 
 (* Expressions *)
 
@@ -272,10 +277,10 @@ base_cond:
   base_cond__open(base_cond)                                     { $1 }
 
 base_expr(right_expr):
-  reg(let_expr(right_expr))                              { LetExpr $1 }
-| fun_expr(right_expr)                                   {     Fun $1 }
-| reg(csv(disj_expr))                                    {   Tuple $1 }
+  let_expr(right_expr)
+| fun_expr(right_expr)
 | disj_expr                                              {         $1 }
+| reg(csv(disj_expr))                                    {   Tuple $1 }
 
 conditional(right_expr):
   if_then_else(right_expr)
@@ -312,16 +317,17 @@ case(right_expr):
   let_lhs sym(ARROW) right_expr                            { $1,$2,$3 }
 
 let_expr(right_expr):
-  kwd(Let) let_bindings kwd(In) right_expr {
-    LetIn ($1,$2,$3,$4)
+  reg(kwd(Let) let_bindings kwd(In) right_expr {$1,$2,$3,$4}) {
+    LetIn $1
   }
-| kwd(Let) kwd(Rec) let_rec_bindings kwd(In) right_expr {
-    LetRecIn ($1,$2,$3,$4,$5) }
+| reg(kwd(Let) kwd(Rec) let_rec_bindings kwd(In) right_expr {
+        $1,$2,$3,$4,$5 }) {
+    LetRecIn $1 }
 
 fun_expr(right_expr):
   reg(kwd(Fun) nseq(pattern) sym(ARROW) right_expr {$1,$2,$3,$4}) {
     let Region.{region; value = kwd_fun, patterns, arrow, expr} = $1
-    in norm ~reg:(region, kwd_fun) patterns arrow expr }
+    in Fun (norm ~reg:(region, kwd_fun) patterns arrow expr) }
 
 disj_expr:
   reg(disj_expr sym(BOOL_OR) conj_expr {$1,$2,$3})         {    Or $1 }

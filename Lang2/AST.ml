@@ -140,7 +140,7 @@ and let_rec_bindings = (let_rec_binding,  kwd_and) Utils.nsepseq
 and let_rec_binding  = {
   pattern     : variable;
   eq          : eq;
-  let_rec_rhs : fun_expr
+  let_rec_rhs : expr
 }
 
 (* Recursive types *)
@@ -201,11 +201,12 @@ and pattern =
 | Ppar   of pattern par reg
 
 and expr =
-  LetExpr of let_expr reg      (* let [rec] p1 = e1 and p2 = e2 and ... in e *)
-| Fun     of fun_expr          (* fun x -> e                                 *)
-| If      of conditional      (* if e1 then e2 else e3                      *)
-| Tuple   of expr csv reg      (* e1, e2, ...                                *)
-| Match   of match_expr reg    (* p1 -> e1 | p2 -> e2 | ...                  *)
+  LetIn    of let_in reg       (* let p1 = e1 and p2 = e2 and ... in e       *)
+| LetRecIn of let_rec_in reg   (* let rec p1 = e1 and p2 = e2 and ... in e   *)
+| Fun      of fun_expr         (* fun x -> e                                 *)
+| If       of conditional      (* if e1 then e2 else e3                      *)
+| Tuple    of expr csv reg     (* e1, e2, ...                                *)
+| Match    of match_expr reg   (* p1 -> e1 | p2 -> e2 | ...                  *)
 
 | Cat     of (expr * cat * expr) reg                             (* e1  ^ e2 *)
 | Cons    of (expr * cons * expr) reg                            (* e1 :: e2 *)
@@ -247,9 +248,9 @@ and match_expr = kwd_match * expr * kwd_with * cases
 
 and cases = (pattern * arrow * expr) bsv
 
-and let_expr =
-  LetIn    of kwd_let           * let_bindings     * kwd_in * expr
-| LetRecIn of kwd_let * kwd_rec * let_rec_bindings * kwd_in * expr
+and let_in = kwd_let * let_bindings * kwd_in * expr
+
+and let_rec_in = kwd_let * kwd_rec * let_rec_bindings * kwd_in * expr
 
 and fun_expr = (kwd_fun * variable * arrow * expr) reg
 
@@ -333,7 +334,7 @@ and let_binding_to_string {pattern; let_rhs; _} =
   sprintf "%s = %s" (pattern_to_string pattern) (expr_to_string let_rhs)
 
 and let_rec_binding_to_string {pattern=var; let_rec_rhs; _} =
-  sprintf "%s = %s" var.value (fun_expr_to_string let_rec_rhs)
+  sprintf "%s = %s" var.value (expr_to_string let_rec_rhs)
 
 and type_decl_to_string (_,name,_,type_expr) =
   sprintf "Type %s = %s" name.Region.value
@@ -351,7 +352,8 @@ and type_expr_to_string = function (* TODO *)
 and cartesian_to_string (_, product) = failwith "(* TODO *)"
 
 and expr_to_string = function
-     LetExpr {value;_} -> let_expr_to_string value
+      LetIn {value; _} -> let_in_to_string value
+|  LetRecIn {value; _} -> let_rec_in_to_string value
 |      Tuple {value;_} -> tuple_to_string (expr_to_string) value
 |      Match {value;_} -> match_expr_to_string value
 |             Fun expr -> fun_expr_to_string expr
@@ -423,13 +425,13 @@ and case_to_string (pattern, _arrow, expr) =
 and fun_expr_to_string {value=_,var,_,expr;_} =
   sprintf "Fun (%s, %s)" var.value (expr_to_string expr)
 
-and let_expr_to_string = function
-  LetIn (_,bindings,_, e) ->
-    sprintf "LetIn ([%s], %s)"
-      (let_bindings_to_string bindings) (expr_to_string e)
-| LetRecIn (_,_,bindings,_, e) ->
-    sprintf "LetRecIn ([%s], %s)"
-      (let_rec_bindings_to_string bindings) (expr_to_string e)
+and let_in_to_string (_,bindings,_, e) =
+  sprintf "LetIn ([%s], %s)"
+    (let_bindings_to_string bindings) (expr_to_string e)
+
+and let_rec_in_to_string (_,_,bindings,_, e) =
+  sprintf "LetRecIn ([%s], %s)"
+    (let_rec_bindings_to_string bindings) (expr_to_string e)
 
 and pattern_to_string = function
   Ptuple {value;_}        -> tuple_to_string pattern_to_string value
@@ -474,7 +476,7 @@ let region_of_pattern = function
 | Pstr {region;_} | Pwild region | Pcons {region;_} | Ppar {region;_} -> region
 
 let region_of_expr = function
-  LetExpr {region;_} | Fun {region;_}
+  LetIn {region;_} | LetRecIn {region;_} | Fun {region;_}
 | If IfThen {region;_} | If IfThenElse {region; _} | Tuple {region;_}
 | Match {region;_} | Cat {region;_} | Cons {region;_} | Or {region;_}
 | And {region;_} | Lt {region;_} | LEq {region;_}
@@ -522,8 +524,8 @@ let norm_fun region kwd_fun pattern eq expr =
     |      _ -> let value     = Utils.gen_sym () in
                 let fresh    = Region.{region=Region.ghost; value} in
                 let bindings = {pattern; eq; let_rhs = Var fresh}, [] in
-                let let_in   = LetIn (ghost_let, bindings, ghost_in, expr) in
-                let expr     = LetExpr Region.{region=Region.ghost; value=let_in}
+                let let_in   = ghost_let, bindings, ghost_in, expr in
+                let expr     = LetIn {value=let_in; region=Region.ghost}
     in kwd_fun, fresh, ghost_arrow, expr
   in Region.{region; value}
 
@@ -554,7 +556,7 @@ let rec unparse' = function
   Fun {value=_,var,arrow,expr; _} ->
     if var.region#is_ghost then
       match expr with
-        LetExpr {value=LetIn (_,({pattern;eq;_},[]),_,expr); _} ->
+        LetIn {value = _,({pattern;eq;_},[]),_,expr; _} ->
           if eq#is_ghost then
             let patterns, sep, e = unparse' expr
             in Utils.nseq_cons pattern patterns, sep, e
@@ -633,7 +635,7 @@ and print_let_rec_bindings undo bindings =
   print_nsepseq "and" (print_let_rec_binding undo) bindings
 
 and print_let_rec_binding undo {pattern=var; eq; let_rec_rhs} =
-  let binding = {pattern = Pvar var; eq; let_rhs = Fun let_rec_rhs}
+  let binding = {pattern = Pvar var; eq; let_rhs = let_rec_rhs}
   in print_let_binding undo binding
 
 and print_pattern = function
@@ -658,7 +660,8 @@ and print_pattern = function
     print_token lpar "("; print_pattern p; print_token rpar ")"
 
 and print_expr undo = function
-  LetExpr {value;_} -> print_let_expr undo value
+  LetIn {value;_} -> print_let_in undo value
+| LetRecIn {value;_} -> print_let_rec_in undo value
 |           If cond -> print_conditional undo cond
 |   Tuple {value;_} -> print_csv (print_expr undo) value
 |   Match {value;_} -> print_match_expr undo value
@@ -728,18 +731,18 @@ and print_case undo (pattern, arrow, expr) =
   print_token arrow "->";
   print_expr undo expr
 
-and print_let_expr undo = function
-  LetIn (kwd_let, let_bindings, kwd_in, expr) ->
-    print_token kwd_let "let";
-    print_let_bindings undo let_bindings;
-    print_token kwd_in "in";
-    print_expr undo expr
-| LetRecIn (kwd_let, kwd_rec, let_rec_bindings, kwd_in, expr) ->
-    print_token kwd_let "let";
-    print_token kwd_rec "rec";
-    print_let_rec_bindings undo let_rec_bindings;
-    print_token kwd_in "in";
-    print_expr undo expr
+and print_let_in undo (kwd_let, let_bindings, kwd_in, expr) =
+  print_token kwd_let "let";
+  print_let_bindings undo let_bindings;
+  print_token kwd_in "in";
+  print_expr undo expr
+
+and print_let_rec_in undo (kwd_let, kwd_rec, let_rec_bindings, kwd_in, expr) =
+  print_token kwd_let "let";
+  print_token kwd_rec "rec";
+  print_let_rec_bindings undo let_rec_bindings;
+  print_token kwd_in "in";
+  print_expr undo expr
 
 and print_fun_expr undo (kwd_fun, rvar, arrow, expr) =
   print_token kwd_fun "fun";
@@ -800,7 +803,7 @@ and fv_let_rec_bindings (env, fv) bindings =
       env bindings
   in env', Utils.nsepseq_foldl (fv_let_rec_binding env') fv bindings
 
-and fv_let_rec_binding env fv {let_rec_rhs=expr;_} = fv_expr env fv (Fun expr)
+and fv_let_rec_binding env fv {let_rec_rhs=expr;_} = fv_expr env fv expr
 
 and pattern_vars fv = function
   Ptuple {value; _}         -> Utils.nsepseq_foldl pattern_vars fv value
@@ -812,7 +815,8 @@ and pattern_vars fv = function
 | Ptrue _ | Pfalse _ | Pstr _ -> fv
 
 and fv_expr env fv = function
-       LetExpr {value;_} -> fv_let_expr (env, fv) value
+       LetIn {value;_} -> fv_let_in (env, fv) value
+|  LetRecIn {value;_} -> fv_let_rec_in (env, fv) value
 | Fun {value=_,v,_,e; _} -> fv_expr (Vars.add v.value env) fv e
 |   Tuple {value; _} -> Utils.nsepseq_foldl (fv_expr env) fv value
 |            If cond -> fv_cond env fv cond
@@ -853,11 +857,11 @@ and fv_cases env fv cases = Utils.nsepseq_foldl (fv_case env) fv cases
 and fv_case env fv (pattern, _, expr) =
   fv_expr (Vars.union (pattern_vars Vars.empty pattern) env) fv expr
 
-and fv_let_expr state = function
-  LetIn (_,bindings,_,expr) ->
-    (Utils.uncurry fv_expr) (fv_let_bindings state bindings) expr
-| LetRecIn (_,_,bindings,_,expr) ->
-    (Utils.uncurry fv_expr) (fv_let_rec_bindings state bindings) expr
+and fv_let_in state (_,bindings,_,expr) =
+  (Utils.uncurry fv_expr) (fv_let_bindings state bindings) expr
+
+and fv_let_rec_in state (_,_,bindings,_,expr) =
+  (Utils.uncurry fv_expr) (fv_let_rec_bindings state bindings) expr
 
 let init_env = Vars.empty
              |> Vars.add "string_of_int"

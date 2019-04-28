@@ -155,7 +155,7 @@ and let_rec_bindings = (let_rec_binding,  kwd_and) Utils.nsepseq
 and let_rec_binding  = {
   pattern     : variable;
   eq          : eq;
-  let_rec_rhs : fun_expr
+  let_rec_rhs : expr
 }
 
 (* Recursive types *)
@@ -217,11 +217,12 @@ and pattern =
 
 and expr =
   (*  Seq     of expr ssv reg*)
-| LetExpr of let_expr reg      (* let [rec] p1 = e1 and p2 = e2 and ... in e *)
-| Fun     of fun_expr          (* fun x -> e                                 *)
-| If      of conditional     (* if e1 then e2 else e3                      *)
-| Tuple   of expr csv reg      (* e1, e2, ...                                *)
-| Match   of match_expr reg    (* p1 -> e1 | p2 -> e2 | ...                  *)
+  LetIn    of let_in reg       (* let p1 = e1 and p2 = e2 and ... in e       *)
+| LetRecIn of let_rec_in reg   (* let rec p1 = e1 and p2 = e2 and ... in e   *)
+| Fun      of fun_expr         (* fun x -> e                                 *)
+| If       of conditional      (* if e1 then e2 else e3                      *)
+| Tuple    of expr csv reg     (* e1, e2, ...                                *)
+| Match    of match_expr reg   (* p1 -> e1 | p2 -> e2 | ...                  *)
 
 | Cat     of (expr * cat * expr) reg                             (* e1  ^ e2 *)
 | Cons    of (expr * cons * expr) reg                            (* e1 :: e2 *)
@@ -263,9 +264,9 @@ and match_expr = kwd_match * expr * kwd_with * cases
 
 and cases = (pattern * arrow * expr) bsv
 
-and let_expr =
-  LetIn    of kwd_let           * let_bindings     * kwd_in * expr
-| LetRecIn of kwd_let * kwd_rec * let_rec_bindings * kwd_in * expr
+and let_in = kwd_let * let_bindings * kwd_in * expr
+
+and let_rec_in = kwd_let * kwd_rec * let_rec_bindings * kwd_in * expr
 
 and fun_expr = (kwd_fun * variable * arrow * expr) reg
 
