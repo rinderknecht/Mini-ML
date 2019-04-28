@@ -8,6 +8,7 @@ type 'a reg = 'a Region.reg
 
 type keyword   = Region.t
 type kwd_and   = Region.t
+type kwd_begin = Region.t
 type kwd_else  = Region.t
 type kwd_end   = Region.t
 type kwd_false = Region.t
@@ -207,6 +208,7 @@ and expr =
 | If       of conditional      (* if e1 then e2 else e3                      *)
 | Tuple    of expr csv reg     (* e1, e2, ...                                *)
 | Match    of match_expr reg   (* p1 -> e1 | p2 -> e2 | ...                  *)
+| Seq      of sequence reg                     (* begin e1; e2; ... ; en end *)
 
 | Cat     of (expr * cat * expr) reg                             (* e1  ^ e2 *)
 | Cons    of (expr * cons * expr) reg                            (* e1 :: e2 *)
@@ -243,6 +245,12 @@ and expr =
 | List    of expr ssv brackets reg                          (* [e1; e2; ...] *)
 | Extern  of extern
 | Constr  of constr
+
+and sequence = {
+  kwd_begin : kwd_begin;
+  sequence  : expr ssv;
+  kwd_end   : kwd_end
+}
 
 and match_expr = kwd_match * expr * kwd_with * cases
 
