@@ -119,11 +119,6 @@ sepseq(X,Sep):
 csv(X):
   X sym(COMMA) nsepseq(X,sym(COMMA)) { let h,t = $3 in $1,($2,h)::t }
 
-(* Non-empty bar-separated productions *)
-
-bsv(X):
-  nsepseq(X,sym(VBAR)) { $1 }
-
 (* Possibly empty semicolon-separated values between brackets *)
 
 list_of(X):
@@ -281,6 +276,7 @@ base_expr(right_expr):
 | fun_expr(right_expr)
 | disj_expr                                              {         $1 }
 | reg(csv(disj_expr))                                    {   Tuple $1 }
+| reg(sequence)                                          {     Seq $1 }
 
 conditional(right_expr):
   if_then_else(right_expr)
@@ -328,6 +324,10 @@ fun_expr(right_expr):
   reg(kwd(Fun) nseq(pattern) sym(ARROW) right_expr {$1,$2,$3,$4}) {
     let Region.{region; value = kwd_fun, patterns, arrow, expr} = $1
     in Fun (norm ~reg:(region, kwd_fun) patterns arrow expr) }
+
+sequence:
+  kwd(Begin) sepseq(expr,sym(SEMI)) kwd(End) {
+    {kwd_begin = $1; sequence = $2; kwd_end = $3} }
 
 disj_expr:
   reg(disj_expr sym(BOOL_OR) conj_expr {$1,$2,$3})         {    Or $1 }

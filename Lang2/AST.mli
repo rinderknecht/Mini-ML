@@ -19,6 +19,7 @@ type 'a reg = 'a Region.reg
 
 type keyword   = Region.t
 type kwd_and   = Region.t
+type kwd_begin = Region.t
 type kwd_else  = Region.t
 type kwd_end   = Region.t
 type kwd_false = Region.t
@@ -216,13 +217,13 @@ and pattern =
 | Ppar   of pattern par reg                                 (*           (p) *)
 
 and expr =
-  (*  Seq     of expr ssv reg*)
   LetIn    of let_in reg       (* let p1 = e1 and p2 = e2 and ... in e       *)
 | LetRecIn of let_rec_in reg   (* let rec p1 = e1 and p2 = e2 and ... in e   *)
 | Fun      of fun_expr         (* fun x -> e                                 *)
 | If       of conditional      (* if e1 then e2 else e3                      *)
 | Tuple    of expr csv reg     (* e1, e2, ...                                *)
 | Match    of match_expr reg   (* p1 -> e1 | p2 -> e2 | ...                  *)
+| Seq      of sequence reg     (* begin e1; e2; ... ; en end                 *)
 
 | Cat     of (expr * cat * expr) reg                             (* e1  ^ e2 *)
 | Cons    of (expr * cons * expr) reg                            (* e1 :: e2 *)
@@ -259,6 +260,12 @@ and expr =
 | List    of expr ssv brackets reg                          (* [e1; e2; ...] *)
 | Extern  of extern
 | Constr  of constr
+
+and sequence = {
+  kwd_begin : kwd_begin;
+  sequence  : expr ssv;
+  kwd_end   : kwd_end
+}
 
 and match_expr = kwd_match * expr * kwd_with * cases
 
