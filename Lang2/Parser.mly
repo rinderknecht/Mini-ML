@@ -276,7 +276,6 @@ base_expr(right_expr):
 | fun_expr(right_expr)
 | disj_expr                                              {         $1 }
 | reg(csv(disj_expr))                                    {   Tuple $1 }
-| reg(sequence)                                          {     Seq $1 }
 
 conditional(right_expr):
   if_then_else(right_expr)
@@ -324,10 +323,6 @@ fun_expr(right_expr):
   reg(kwd(Fun) nseq(pattern) sym(ARROW) right_expr {$1,$2,$3,$4}) {
     let Region.{region; value = kwd_fun, patterns, arrow, expr} = $1
     in Fun (norm ~reg:(region, kwd_fun) patterns arrow expr) }
-
-sequence:
-  kwd(Begin) sepseq(expr,sym(SEMI)) kwd(End) {
-    {kwd_begin = $1; sequence = $2; kwd_end = $3} }
 
 disj_expr:
   reg(disj_expr sym(BOOL_OR) conj_expr {$1,$2,$3})         {    Or $1 }
@@ -384,3 +379,8 @@ core_expr:
 | list_of(expr)                                            {   List $1 }
 | reg(par(expr))                                           {    Par $1 }
 | constr                                                   { Constr $1 }
+| reg(sequence)                                            {    Seq $1 }
+
+sequence:
+  kwd(Begin) sepseq(expr,sym(SEMI)) kwd(End) {
+    {kwd_begin = $1; sequence = $2; kwd_end = $3} }
