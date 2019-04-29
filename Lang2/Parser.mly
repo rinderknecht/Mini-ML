@@ -380,6 +380,20 @@ core_expr:
 | reg(par(expr))                                           {    Par $1 }
 | constr                                                   { Constr $1 }
 | reg(sequence)                                            {    Seq $1 }
+| reg(record_expr)                                         { Record $1 }
+
+record_expr:
+  sym(LBRACE) sep_or_term_list(reg(field_assignment),sym(SEMI))
+  sym(RBRACE) {
+    let elements, terminator = $2 in
+    {opening = $1;
+     elements = Some elements;
+     terminator;
+     closing = $3} }
+
+field_assignment:
+  field_name sym(EQ) expr {
+    {field_name=$1; assignment=$2; field_expr=$3} }
 
 sequence:
   kwd(Begin) sepseq(expr,sym(SEMI)) kwd(End) {

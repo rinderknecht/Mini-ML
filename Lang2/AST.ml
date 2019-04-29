@@ -208,7 +208,9 @@ and expr =
 | If       of conditional      (* if e1 then e2 else e3                      *)
 | Tuple    of expr csv reg     (* e1, e2, ...                                *)
 | Match    of match_expr reg   (* p1 -> e1 | p2 -> e2 | ...                  *)
-| Seq      of sequence reg                     (* begin e1; e2; ... ; en end *)
+| Seq      of sequence reg     (* begin e1; e2; ... ; en end *)
+
+| Record   of record_expr      (* {f1=e1; ... } *)
 
 | Cat     of (expr * cat * expr) reg                             (* e1  ^ e2 *)
 | Cons    of (expr * cons * expr) reg                            (* e1 :: e2 *)
@@ -245,6 +247,14 @@ and expr =
 | List    of expr ssv brackets reg                          (* [e1; e2; ...] *)
 | Extern  of extern
 | Constr  of constr
+
+and record_expr = field_assignment reg injection reg
+
+and field_assignment = {
+  field_name : field_name;
+  assignment : eq;
+  field_expr : expr
+}
 
 and sequence = {
   kwd_begin : kwd_begin;

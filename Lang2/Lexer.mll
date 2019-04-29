@@ -68,7 +68,6 @@ let keywords = Token.[
   "fun",    Some Fun;
   "if",     Some If;
   "in",     Some In;
-  "else",   Some Else;
   "end",    Some End;
   "let",    Some Let;
   "match",  Some Match;
