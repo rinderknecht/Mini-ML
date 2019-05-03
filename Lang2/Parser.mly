@@ -116,8 +116,11 @@ sepseq(X,Sep):
 
 (* Non-empty comma-separated values (at least two values) *)
 
-csv(X):
+tuple(X):
   X sym(COMMA) nsepseq(X,sym(COMMA)) { let h,t = $3 in $1,($2,h)::t }
+
+csv(X):
+  nsepseq(X,sym(COMMA)) { $1 }
 
 (* Possibly empty semicolon-separated values between brackets *)
 
@@ -179,7 +182,7 @@ type_constr:
 | kwd(List) { Region.{value="list"; region=$1} }
 
 type_tuple:
-  par(csv(type_expr)) { $1 }
+  par(tuple(type_expr)) { $1 }
 
 sum_type:
   nsepseq(reg(variant),sym(VBAR)) { $1 }
@@ -206,7 +209,7 @@ let_rec_bindings:
   nsepseq(let_rec_binding, kwd(And)) { $1 }
 
 let_rec_binding:
-  ident nseq(pattern) sym(EQ) expr {
+  ident nseq(sub_irrefutable) sym(EQ) expr {
     {pattern = $1; eq = Region.ghost;
      let_rec_rhs = Fun (norm $2 $3 $4)}
   }
@@ -219,44 +222,59 @@ let_bindings:
   nsepseq(let_binding, kwd(And)) { $1 }
 
 let_binding:
-  ident nseq(pattern) sym(EQ) expr {
+  ident nseq(sub_irrefutable) sym(EQ) expr {
     let let_rhs = Fun (norm $2 $3 $4) in
     {pattern = Pvar $1; eq = Region.ghost; let_rhs}
   }
-| let_lhs sym(EQ) expr {
+| irrefutable sym(EQ) expr {
     {pattern=$1; eq=$2; let_rhs=$3} }
 
 (* Patterns *)
 
-let_lhs:
-  reg(pattern sym(CONS) cons_pat {$1,$2,$3})              {  Pcons $1 }
-| reg(csv(pattern))                                       { Ptuple $1 }
-| base_pattern                                            {        $1 }
+irrefutable:
+  reg(tuple(sub_irrefutable))                            {  Ptuple $1 }
+| sub_irrefutable                                        {         $1 }
 
-base_pattern:
-  ident                                                   {   Pvar $1 }
-| sym(WILD)                                               {  Pwild $1 }
-| unit                                                    {  Punit $1 }
-| reg(Int)                                                {   Pint $1 }
-| kwd(True)                                               {  Ptrue $1 }
-| kwd(False)                                              { Pfalse $1 }
-| string                                                  {   Pstr $1 }
-| list_of(cons_pat)                                       {  Plist $1 }
-| reg(par(ptuple))                                        {   Ppar $1 }
-
-ptuple:
-  reg(csv(cons_pat))                                      { Ptuple $1 }
-
-unit:
-  reg(sym(LPAR) sym(RPAR) {$1,$2})                               { $1 }
-
-cons_pat:
-  reg(pattern sym(CONS) cons_pat {$1,$2,$3})               { Pcons $1 }
-| pattern                                                  {       $1 }
+sub_irrefutable:
+  ident                                                  {    Pvar $1 }
+| sym(WILD)                                              {   Pwild $1 }
+| unit                                                   {   Punit $1 }
+| reg(par(reg(tuple(sub_irrefutable)) { Ptuple $1 }))
+| reg(par(sub_irrefutable))                              {    Ppar $1 }
 
 pattern:
-  reg(par(cons_pat))                                        { Ppar $1 }
-| base_pattern                                              {      $1 }
+  reg(sub_pattern sym(CONS) tail {$1,$2,$3})             {   Pcons $1 }
+| reg(tuple(sub_pattern))                                {  Ptuple $1 }
+| core_pattern                                           {         $1 }
+
+sub_pattern:
+  reg(par(tail))                                         {    Ppar $1 }
+| core_pattern                                           {         $1 }
+
+core_pattern:
+  ident                                                  {    Pvar $1 }
+| sym(WILD)                                              {   Pwild $1 }
+| unit                                                   {   Punit $1 }
+| reg(Int)                                               {    Pint $1 }
+| kwd(True)                                              {   Ptrue $1 }
+| kwd(False)                                             {  Pfalse $1 }
+| string                                                 {    Pstr $1 }
+| reg(par(ptuple))                                       {    Ppar $1 }
+| list_of(tail)                                          {   Plist $1 }
+| reg(constr_pattern)                                    { Pconstr $1 }
+
+constr_pattern:
+  constr reg(sub_pattern)                                {      $1,$2 }
+
+ptuple:
+  reg(tuple(tail))                                       {  Ptuple $1 }
+
+unit:
+  reg(sym(LPAR) sym(RPAR) {$1,$2})                       {         $1 }
+
+tail:
+  reg(sub_pattern sym(CONS) tail {$1,$2,$3})             {   Pcons $1 }
+| sub_pattern                                            {         $1 }
 
 (* Expressions *)
 
@@ -275,7 +293,7 @@ base_expr(right_expr):
   let_expr(right_expr)
 | fun_expr(right_expr)
 | disj_expr                                              {         $1 }
-| reg(csv(disj_expr))                                    {   Tuple $1 }
+| reg(tuple(disj_expr))                                  {   Tuple $1 }
 
 conditional(right_expr):
   if_then_else(right_expr)
@@ -309,7 +327,7 @@ cases(right_expr):
     let h,t = $1 in $3, ($2,h)::t }
 
 case(right_expr):
-  let_lhs sym(ARROW) right_expr                            { $1,$2,$3 }
+  pattern sym(ARROW) right_expr                            { $1,$2,$3 }
 
 let_expr(right_expr):
   reg(kwd(Let) let_bindings kwd(In) right_expr {$1,$2,$3,$4}) {
@@ -320,7 +338,7 @@ let_expr(right_expr):
     LetRecIn $1 }
 
 fun_expr(right_expr):
-  reg(kwd(Fun) nseq(pattern) sym(ARROW) right_expr {$1,$2,$3,$4}) {
+  reg(kwd(Fun) nseq(irrefutable) sym(ARROW) right_expr {$1,$2,$3,$4}) {
     let Region.{region; value = kwd_fun, patterns, arrow, expr} = $1
     in Fun (norm ~reg:(region, kwd_fun) patterns arrow expr) }
 
@@ -370,17 +388,17 @@ call_expr:
 | core_expr                                                {       $1 }
 
 core_expr:
-  reg(Int)                                                 {    Int $1 }
-| ident                                                    {    Var $1 }
-| string                                                   {    Str $1 }
-| unit                                                     {   Unit $1 }
-| kwd(False)                                               {  False $1 }
-| kwd(True)                                                {   True $1 }
-| list_of(expr)                                            {   List $1 }
-| reg(par(expr))                                           {    Par $1 }
-| constr                                                   { Constr $1 }
-| reg(sequence)                                            {    Seq $1 }
-| reg(record_expr)                                         { Record $1 }
+  reg(Int)                                                {    Int $1 }
+| ident                                                   {    Var $1 }
+| string                                                  {    Str $1 }
+| unit                                                    {   Unit $1 }
+| kwd(False)                                              {  False $1 }
+| kwd(True)                                               {   True $1 }
+| list_of(expr)                                           {   List $1 }
+| reg(par(expr))                                          {    Par $1 }
+| constr                                                  { Constr $1 }
+| reg(sequence)                                           {    Seq $1 }
+| reg(record_expr)                                        { Record $1 }
 
 record_expr:
   sym(LBRACE) sep_or_term_list(reg(field_assignment),sym(SEMI))

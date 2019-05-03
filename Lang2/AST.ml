@@ -200,51 +200,54 @@ and pattern =
 | Pwild  of wild
 | Pcons  of (pattern * cons * pattern) reg
 | Ppar   of pattern par reg
+| Pconstr of (constr * pattern reg) reg
+(* TODO: Precord *)
 
 and expr =
-  LetIn    of let_in reg       (* let p1 = e1 and p2 = e2 and ... in e       *)
-| LetRecIn of let_rec_in reg   (* let rec p1 = e1 and p2 = e2 and ... in e   *)
-| Fun      of fun_expr         (* fun x -> e                                 *)
-| If       of conditional      (* if e1 then e2 else e3                      *)
-| Tuple    of expr csv reg     (* e1, e2, ...                                *)
-| Match    of match_expr reg   (* p1 -> e1 | p2 -> e2 | ...                  *)
-| Seq      of sequence reg     (* begin e1; e2; ... ; en end *)
+  LetIn    of let_in reg
+| LetRecIn of let_rec_in reg
+| Fun      of fun_expr
+| If       of conditional
+| Tuple    of expr csv reg
+| Match    of match_expr reg
+| Seq      of sequence reg
 
-| Record   of record_expr      (* {f1=e1; ... } *)
+| Record   of record_expr
+(* TODO: selection in a record *)
 
-| Cat     of (expr * cat * expr) reg                             (* e1  ^ e2 *)
-| Cons    of (expr * cons * expr) reg                            (* e1 :: e2 *)
+| Cat     of (expr * cat * expr) reg
+| Cons    of (expr * cons * expr) reg
 
-| Or      of (expr * bool_or * expr) reg                         (* e1 || e2 *)
-| And     of (expr * bool_and * expr) reg                        (* e1 && e2 *)
+| Or      of (expr * bool_or * expr) reg
+| And     of (expr * bool_and * expr) reg
 
-| Lt      of (expr * lt * expr) reg                              (* e1  < e2 *)
-| LEq     of (expr * le * expr) reg                              (* e1 <= e2 *)
-| Gt      of (expr * gt * expr) reg                              (* e1  > e2 *)
-| GEq     of (expr * ge * expr) reg                              (* e1 >= e2 *)
-| NEq     of (expr * ne * expr) reg                              (* e1 <> e2 *)
-| Eq      of (expr * eq * expr) reg                              (* e1  = e2 *)
+| Lt      of (expr * lt * expr) reg
+| LEq     of (expr * le * expr) reg
+| Gt      of (expr * gt * expr) reg
+| GEq     of (expr * ge * expr) reg
+| NEq     of (expr * ne * expr) reg
+| Eq      of (expr * eq * expr) reg
 
-| Add     of (expr * plus   * expr) reg                          (* e1  + e2 *)
-| Sub     of (expr * minus  * expr) reg                          (* e1  - e2 *)
+| Add     of (expr * plus   * expr) reg
+| Sub     of (expr * minus  * expr) reg
 
-| Mult    of (expr * mult    * expr) reg                        (* e1  *  e2 *)
-| Div     of (expr * div     * expr) reg                        (* e1  /  e2 *)
-| Mod     of (expr * kwd_mod * expr) reg                        (* e1 mod e2 *)
+| Mult    of (expr * mult    * expr) reg
+| Div     of (expr * div     * expr) reg
+| Mod     of (expr * kwd_mod * expr) reg
 
-| Neg     of (minus   * expr) reg                                   (*    -e *)
-| Not     of (kwd_not * expr) reg                                   (* not e *)
+| Neg     of (minus   * expr) reg
+| Not     of (kwd_not * expr) reg
 
-| Call    of (expr * expr) reg                                        (* f e *)
+| Call    of (expr * expr) reg
 
-| Int     of Z.t reg                                        (* 12345         *)
-| Var     of variable                                       (* x             *)
-| Str     of string reg                                     (* "foo"         *)
-| Unit    of the_unit reg                                   (* ()            *)
-| True    of kwd_true                                       (* true          *)
-| False   of kwd_false                                      (* false         *)
-| Par     of expr par reg                                   (* (e)           *)
-| List    of expr ssv brackets reg                          (* [e1; e2; ...] *)
+| Int     of Z.t reg
+| Var     of variable
+| Str     of string reg
+| Unit    of the_unit reg
+| True    of kwd_true
+| False   of kwd_false
+| Par     of expr par reg
+| List    of expr ssv brackets reg
 | Extern  of extern
 | Constr  of constr
 

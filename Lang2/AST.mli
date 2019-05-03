@@ -215,6 +215,7 @@ and pattern =
 | Pwild  of wild                                            (*             _ *)
 | Pcons  of (pattern * cons * pattern) reg                  (*      p1 :: p2 *)
 | Ppar   of pattern par reg                                 (*           (p) *)
+| Pconstr of (constr * pattern reg) reg                     (*    A B (3,"") *)
 
 and expr =
   LetIn    of let_in reg       (* let p1 = e1 and p2 = e2 and ... in e       *)

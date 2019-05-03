@@ -2,15 +2,7 @@ let () =
   if true then
     match 3 with
       1 -> if false then ()
-    | 3 -> (*match 4 with
+(*    | 3 -> (match 4 with
              1 -> ()
-           | 4 -> *) ()
+        | 4 -> ()) *)
   else ()
-
-
-let () =
-  match 3 with
-    1 -> if false then ()
-  | 3 -> (match 4 with
-           1 -> ()
-         | 4 -> ())
