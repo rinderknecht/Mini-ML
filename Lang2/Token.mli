@@ -29,6 +29,7 @@ type t =
 | SEMI     (* ";" *)
 | VBAR     (* "|" *)
 | COLON    (* ":" *)
+| DOT      (* "." *)
 
   (* Wildcard *)
 

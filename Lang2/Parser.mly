@@ -119,9 +119,6 @@ sepseq(X,Sep):
 tuple(X):
   X sym(COMMA) nsepseq(X,sym(COMMA)) { let h,t = $3 in $1,($2,h)::t }
 
-csv(X):
-  nsepseq(X,sym(COMMA)) { $1 }
-
 (* Possibly empty semicolon-separated values between brackets *)
 
 list_of(X):
@@ -148,7 +145,7 @@ type_expr:
 | reg(record_type)                                       { TRecord $1 }
 
 cartesian:
-  nsepseq(fun_type,sym(TIMES))                                   { $1 }
+  nsepseq(fun_type, sym(TIMES))                                  { $1 }
 
 fun_type:
   core_type                                                 {      $1 }
@@ -185,7 +182,7 @@ type_tuple:
   par(tuple(type_expr)) { $1 }
 
 sum_type:
-  nsepseq(reg(variant),sym(VBAR)) { $1 }
+  nsepseq(reg(variant), sym(VBAR)) { $1 }
 
 variant:
   constr kwd(Of) cartesian { {constr=$1; kwd_of=$2; product=$3} }
@@ -262,6 +259,21 @@ core_pattern:
 | reg(par(ptuple))                                       {    Ppar $1 }
 | list_of(tail)                                          {   Plist $1 }
 | reg(constr_pattern)                                    { Pconstr $1 }
+| reg(record_pattern)                                    { Precord $1 }
+
+record_pattern:
+  sym(LBRACE)
+    sep_or_term_list(reg(field_pattern),sym(SEMI))
+  sym(RBRACE) {
+    let elements, terminator = $2 in
+    {opening = $1;
+     elements = Some elements;
+     terminator;
+     closing = $3} }
+
+field_pattern:
+  field_name sym(EQ) sub_pattern {
+    {field_name=$1; eq=$2; pattern=$3} }
 
 constr_pattern:
   constr reg(sub_pattern)                                {      $1,$2 }
@@ -389,7 +401,7 @@ call_expr:
 
 core_expr:
   reg(Int)                                                {    Int $1 }
-| ident                                                   {    Var $1 }
+| reg(path)                                               {   Path $1 }
 | string                                                  {    Str $1 }
 | unit                                                    {   Unit $1 }
 | kwd(False)                                              {  False $1 }
@@ -400,8 +412,12 @@ core_expr:
 | reg(sequence)                                           {    Seq $1 }
 | reg(record_expr)                                        { Record $1 }
 
+path:
+  nsepseq(ident, sym(DOT)) { $1 }
+
 record_expr:
-  sym(LBRACE) sep_or_term_list(reg(field_assignment),sym(SEMI))
+  sym(LBRACE)
+    sep_or_term_list(reg(field_assignment),sym(SEMI))
   sym(RBRACE) {
     let elements, terminator = $2 in
     {opening = $1;

@@ -18,6 +18,7 @@
 %token ARROW
 %token CONS
 %token CAT
+%token DOT
 
 %token COMMA
 %token SEMI

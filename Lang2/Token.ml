@@ -20,6 +20,7 @@ type t =
 | SEMI
 | VBAR
 | COLON
+| DOT
 | WILD
 | EQ
 | NE
@@ -85,6 +86,7 @@ let to_string = function
 | SEMI     -> ";"
 | VBAR     -> "|"
 | COLON    -> ":"
+| DOT      -> "."
 | WILD     -> "_"
 | EQ       -> "="
 | NE       -> "<>"

@@ -42,6 +42,7 @@ type kwd_with  = Region.t
 type arrow = Region.t                                                (* "->" *)
 type cons  = Region.t                                                (* "::" *)
 type cat   = Region.t                                                (* "^"  *)
+type dot   = Region.t                                                (* "."  *)
 
 (* Arithmetic operators *)
 
@@ -92,6 +93,7 @@ type field_name  = string reg
 type map_name    = string reg
 type set_name    = string reg
 type constr      = string reg
+type ident       = string reg
 
 (* Comma-separated non-empty lists *)
 
@@ -204,18 +206,27 @@ and field_decl = {
 }
 
 and pattern =
-  Ptuple of pattern csv reg                                 (* p1, p2, ...   *)
-| Plist  of pattern ssv brackets reg                        (* [p1; p2; ...] *)
-| Pvar   of variable                                        (*             x *)
-| Punit  of the_unit reg                                    (*            () *)
-| Pint   of Z.t reg                                         (*             7 *)
-| Ptrue  of kwd_true                                        (*          true *)
-| Pfalse of kwd_false                                       (*         false *)
-| Pstr   of string reg                                      (*         "foo" *)
-| Pwild  of wild                                            (*             _ *)
-| Pcons  of (pattern * cons * pattern) reg                  (*      p1 :: p2 *)
-| Ppar   of pattern par reg                                 (*           (p) *)
+  Ptuple  of pattern csv reg                                (* p1, p2, ...   *)
+| Plist   of pattern ssv brackets reg                       (* [p1; p2; ...] *)
+| Pvar    of variable                                       (*             x *)
+| Punit   of the_unit reg                                   (*            () *)
+| Pint    of Z.t reg                                        (*             7 *)
+| Ptrue   of kwd_true                                       (*          true *)
+| Pfalse  of kwd_false                                      (*         false *)
+| Pstr    of string reg                                     (*         "foo" *)
+| Pwild   of wild                                           (*             _ *)
+| Pcons   of (pattern * cons * pattern) reg                 (*      p1 :: p2 *)
+| Ppar    of pattern par reg                                (*           (p) *)
 | Pconstr of (constr * pattern reg) reg                     (*    A B (3,"") *)
+| Precord of record_pattern                                 (* {a=... ; ...} *)
+
+and record_pattern = field_pattern reg injection reg
+
+and field_pattern = {
+  field_name : field_name;
+  eq         : eq;
+  pattern    : pattern
+}
 
 and expr =
   LetIn    of let_in reg       (* let p1 = e1 and p2 = e2 and ... in e       *)
@@ -253,15 +264,17 @@ and expr =
 | Call    of (expr * expr) reg                                        (* f e *)
 
 | Int     of Z.t reg                                        (* 12345         *)
-| Var     of variable                                       (* x             *)
+| Path    of path                                           (* x x.y.z       *)
 | Str     of string reg                                     (* "foo"         *)
 | Unit    of the_unit reg                                   (* ()            *)
 | True    of kwd_true                                       (* true          *)
 | False   of kwd_false                                      (* false         *)
 | Par     of expr par reg                                   (* (e)           *)
 | List    of expr ssv brackets reg                          (* [e1; e2; ...] *)
-| Extern  of extern
 | Constr  of constr
+| Extern  of extern
+
+and path = (ident, dot) Utils.nsepseq reg
 
 and record_expr = field_assignment reg injection reg
 

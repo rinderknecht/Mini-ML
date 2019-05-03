@@ -31,6 +31,7 @@ type kwd_with  = Region.t
 type arrow    = Region.t  (* "->" *)
 type cons     = Region.t  (* "::" *)
 type cat      = Region.t  (* "^"  *)
+type dot      = Region.t  (* "."  *)
 
 (* Arithmetic operators *)
 
@@ -81,6 +82,7 @@ type field_name  = string reg
 type map_name    = string reg
 type set_name    = string reg
 type constr      = string reg
+type ident       = string reg
 
 (* Non-empty comma-separated values *)
 
@@ -189,19 +191,27 @@ and field_decl = {
 }
 
 and pattern =
-  Ptuple of pattern csv reg
-| Plist  of pattern ssv brackets reg
-| Pvar   of variable
-| Punit  of the_unit reg
-| Pint   of Z.t reg
-| Ptrue  of kwd_true
-| Pfalse of kwd_false
-| Pstr   of string reg
-| Pwild  of wild
-| Pcons  of (pattern * cons * pattern) reg
-| Ppar   of pattern par reg
+  Ptuple  of pattern csv reg
+| Plist   of pattern ssv brackets reg
+| Pvar    of variable
+| Punit   of the_unit reg
+| Pint    of Z.t reg
+| Ptrue   of kwd_true
+| Pfalse  of kwd_false
+| Pstr    of string reg
+| Pwild   of wild
+| Pcons   of (pattern * cons * pattern) reg
+| Ppar    of pattern par reg
 | Pconstr of (constr * pattern reg) reg
-(* TODO: Precord *)
+| Precord of record_pattern
+
+and record_pattern = field_pattern reg injection reg
+
+and field_pattern = {
+  field_name : field_name;
+  eq         : eq;
+  pattern    : pattern
+}
 
 and expr =
   LetIn    of let_in reg
@@ -211,9 +221,8 @@ and expr =
 | Tuple    of expr csv reg
 | Match    of match_expr reg
 | Seq      of sequence reg
-
 | Record   of record_expr
-(* TODO: selection in a record *)
+  (* TODO: selection in a record *)
 
 | Cat     of (expr * cat * expr) reg
 | Cons    of (expr * cons * expr) reg
@@ -241,15 +250,17 @@ and expr =
 | Call    of (expr * expr) reg
 
 | Int     of Z.t reg
-| Var     of variable
+| Path    of path
 | Str     of string reg
 | Unit    of the_unit reg
 | True    of kwd_true
 | False   of kwd_false
 | Par     of expr par reg
 | List    of expr ssv brackets reg
-| Extern  of extern
 | Constr  of constr
+| Extern  of extern
+
+and path = (ident, dot) Utils.nsepseq reg
 
 and record_expr = field_assignment reg injection reg
 
@@ -370,7 +381,8 @@ and type_expr_to_string = function (* TODO *)
 | TAlias {value=var;_} -> ""
 | TFun _ -> ""
 
-and cartesian_to_string (_, product) = failwith "(* TODO *)"
+and cartesian_to_string (_, product) =
+  failwith "AST.cartesian_to_string: TODO"
 
 and expr_to_string = function
       LetIn {value; _} -> let_in_to_string value
@@ -379,7 +391,7 @@ and expr_to_string = function
 |      Match {value;_} -> match_expr_to_string value
 |             Fun expr -> fun_expr_to_string expr
 |        Int {value;_} -> Z.to_string value
-|        Var {value;_} -> value
+|       Path {value;_} -> path_to_string value
 |        Str {value;_} -> sprintf "\"%s\"" value
 |              False _ -> "false"
 |               True _ -> "true"
@@ -422,6 +434,9 @@ and expr_to_string = function
     sprintf "Mod (%s, %s)" (expr_to_string e1) (expr_to_string e2)
 | Call {value=e1,e2;_} ->
     sprintf "Call (%s, %s)" (expr_to_string e1) (expr_to_string e2)
+
+and path_to_string path =
+  failwith "AST.path_to_string: TODO"
 
 and cond_to_string = function
   IfThenElse {value=_,e,_,e1,_,e2; _} ->
@@ -505,7 +520,7 @@ let region_of_expr = function
 | Add {region;_} | Sub {region;_}
 | Mult {region;_} | Div {region;_} | Mod {region;_}
 | Neg {region;_} | Not {region;_} | Call {region;_}
-| Int {region;_} | Var {region;_} | Str {region;_}
+| Int {region;_} | Path {region;_} | Str {region;_}
 | Unit {region;_} | True region | False region
 | Par {region;_} | List {region;_} -> region
 | Extern _ -> Region.ghost
@@ -514,7 +529,7 @@ let region_of_expr = function
 
 let rec is_var = function
   Par {value={inside=e;_};_} -> is_var e
-    |           Var _ -> true
+|           Path _ -> true
 |                   _ -> false
 
 let rec is_call = function
@@ -544,7 +559,8 @@ let norm_fun region kwd_fun pattern eq expr =
       Pvar v -> kwd_fun, v, eq, expr
     |      _ -> let value     = Utils.gen_sym () in
                 let fresh    = Region.{region=Region.ghost; value} in
-                let bindings = {pattern; eq; let_rhs = Var fresh}, [] in
+                let path     = Region.{region=Region.ghost; value=fresh,[]} in
+                let bindings = {pattern; eq; let_rhs = Path path}, [] in
                 let let_in   = ghost_let, bindings, ghost_in, expr in
                 let expr     = LetIn {value=let_in; region=Region.ghost}
     in kwd_fun, fresh, ghost_arrow, expr
@@ -728,7 +744,7 @@ and print_expr undo = function
 | Not {value=kwd_not,e; _} -> print_token kwd_not "not"; print_expr undo e
 | Call {value=e1,e2; _} -> print_expr undo e1; print_expr undo e2
 | Int {region; value} -> print_token region (sprintf "Int %s" (Z.to_string value))
-| Var v -> print_var v
+| Path p -> print_path p
 | Str s -> print_str s
 | Unit {value=lpar,rpar; _} ->
     print_token lpar "("; print_token rpar ")"
@@ -739,6 +755,8 @@ and print_expr undo = function
 | List {value={lbra; inside=ssv; rbra}; _} ->
     print_token lbra "["; print_ssv (print_expr undo) ssv; print_token rbra "]"
 | Extern _ -> ()
+
+and print_path path = failwith "AST.print_path: TODO"
 
 and print_match_expr undo (kwd_match, expr, kwd_with, cases) =
   print_token kwd_match "match";
@@ -860,7 +878,8 @@ and fv_expr env fv = function
 |           Neg {value=_,e; _}
 |           Not {value=_,e; _}
 |         Par {value={inside=e;_}; _} -> fv_expr env fv e
-|  Var v -> if Vars.mem v.value env then fv else FreeVars.add v fv
+(*|  Var v -> if Vars.mem v.value env then fv else FreeVars.add v fv*)
+| Path p -> failwith "AST.fv_expr: TODO"
 | List {value={inside=l;_}; _} -> Utils.sepseq_foldl (fv_expr env) fv l
 | Int _ | Str _ | Unit _ | True _ | False _ | Extern _ -> fv
 

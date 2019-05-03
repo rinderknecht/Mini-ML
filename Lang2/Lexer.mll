@@ -229,6 +229,7 @@ rule scan = parse
 | ";"    { Token.SEMI     }
 | ":"    { Token.COLON    }
 | "|"    { Token.VBAR     }
+| "."    { Token.DOT      }
 
 | "_"    { Token.WILD     }
 | eof    { Token.EOF      }
