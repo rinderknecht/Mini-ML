@@ -88,41 +88,41 @@ brackets(X): sym(LBRACK) X sym(RBRACK) { {lbra=$1; inside=$2; rbra=$3} }
 
 (* Possibly empty sequence of items *)
 
-seq(X):
-  (**)     {     [] }
-| X seq(X) { $1::$2 }
+seq(item):
+  (**)           {     [] }
+| item seq(item) { $1::$2 }
 
 (* Non-empty sequence of items *)
 
-nseq(X):
-  X seq(X) { $1,$2 }
+nseq(item):
+  item seq(item) { $1,$2 }
 
 (* Non-empty separated sequence of items *)
 
-nsepseq(X,Sep):
-  X                    {                        $1, [] }
-| X Sep nsepseq(X,Sep) { let h,t = $3 in $1, ($2,h)::t }
+nsepseq(item,sep):
+  item                       {                        $1, [] }
+| item sep nsepseq(item,sep) { let h,t = $3 in $1, ($2,h)::t }
 
 (* Possibly empy separated sequence of items *)
 
-sepseq(X,Sep):
-  (**)           {    None }
-| nsepseq(X,Sep) { Some $1 }
+sepseq(item,sep):
+  (**)              {    None }
+| nsepseq(item,sep) { Some $1 }
 
 (* Inlined *)
 
-%inline type_name  : ident { $1 }
-%inline field_name : ident { $1 }
+type_name  : ident { $1 }
+field_name : ident { $1 }
 
 (* Non-empty comma-separated values (at least two values) *)
 
-tuple(X):
-  X sym(COMMA) nsepseq(X,sym(COMMA)) { let h,t = $3 in $1,($2,h)::t }
+tuple(item):
+  item sym(COMMA) nsepseq(item,sym(COMMA)) { let h,t = $3 in $1,($2,h)::t }
 
 (* Possibly empty semicolon-separated values between brackets *)
 
-list_of(X):
-  reg(brackets(sepseq(X,sym(SEMI)))) { $1 }
+list_of(item):
+  reg(brackets(sepseq(item,sym(SEMI)))) { $1 }
 
 (* Main *)
 
@@ -236,8 +236,11 @@ sub_irrefutable:
   ident                                                  {    Pvar $1 }
 | sym(WILD)                                              {   Pwild $1 }
 | unit                                                   {   Punit $1 }
-| reg(par(reg(tuple(sub_irrefutable)) { Ptuple $1 }))
-| reg(par(sub_irrefutable))                              {    Ppar $1 }
+| reg(par(closed_irrefutable))                           {    Ppar $1 }
+
+closed_irrefutable:
+  reg(tuple(sub_irrefutable))                            {  Ptuple $1 }
+| sub_irrefutable                                        {         $1 }
 
 pattern:
   reg(sub_pattern sym(CONS) tail {$1,$2,$3})             {   Pcons $1 }
