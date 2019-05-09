@@ -1,0 +1,23 @@
+(ocamllex
+  (modules Lexer Edit)
+)
+
+(rule
+  (targets Parser.ml Parser.mli)
+  (deps ParToken.mly Parser.mly AST.mli AST.ml Utils.mli Utils.ml)
+  (action (system "menhir --external-tokens Token --base Parser ParToken.mly Parser.mly"))
+)
+
+(executables
+  (names EvalMain ParserMain LexerMain)
+  (libraries getopt zarith str)
+  (modules AST Compile Edit Eval EvalMain EvalOpt Lexer LexerMain Loc Parser ParserMain Partition Partition3 Pos Region Token Utils Version)
+  (modules_without_implementation Partition)
+  (js_of_ocaml)
+  (flags (:standard -g))
+)
+
+(alias
+  (name default)
+  (deps ParserMain.exe)
+)

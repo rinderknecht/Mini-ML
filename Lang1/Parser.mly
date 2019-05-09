@@ -101,7 +101,8 @@ sepseq(X,Sep):
 (* Non-empty comma-separated values *)
 
 csv(X):
-  reg(X sym(COMMA) nsepseq(X,sym(COMMA)) {let h,t = $3 in $1,($2,h)::t}) {$1}
+  reg(X sym(COMMA) nsepseq(X,sym(COMMA))
+       { let h,t = $3 in $1,($2,h)::t }) { $1 }
 
 (* Non-empty bar-separated productions *)
 
