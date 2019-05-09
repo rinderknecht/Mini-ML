@@ -16,6 +16,7 @@ type kwd_fun   = Region.t
 type kwd_if    = Region.t
 type kwd_in    = Region.t
 type kwd_let   = Region.t
+type kwd_let_entry = Region.t
 type kwd_match = Region.t
 type kwd_mod   = Region.t
 type kwd_not   = Region.t
@@ -31,6 +32,7 @@ type kwd_with  = Region.t
 type arrow    = Region.t  (* "->" *)
 type cons     = Region.t  (* "::" *)
 type cat      = Region.t  (* "^"  *)
+type append   = Region.t  (* "@"  *)
 type dot      = Region.t  (* "."  *)
 
 (* Arithmetic operators *)
@@ -122,7 +124,8 @@ and ast = t
 and eof = Region.t
 
 and statement =
-  Let      of (kwd_let           * let_bindings) reg
+  Let      of (kwd_let * let_bindings) reg
+| LetEntry of (kwd_let_entry * let_binding) reg
 | LetRec   of (kwd_let * kwd_rec * let_rec_bindings) reg
 | TypeDecl of type_decl reg
 
@@ -131,9 +134,10 @@ and statement =
 and let_bindings = (let_binding, kwd_and) Utils.nsepseq
 
 and let_binding = {
-  pattern : pattern;
-  eq      : eq;
-  let_rhs : expr
+  pattern  : pattern;
+  lhs_type : (colon * type_expr) option;
+  eq       : eq;
+  let_rhs  : expr
 }
 
 (* Recursive values *)
@@ -142,6 +146,7 @@ and let_rec_bindings = (let_rec_binding,  kwd_and) Utils.nsepseq
 
 and let_rec_binding  = {
   pattern     : variable;
+  lhs_type    : (colon * type_expr) option;
   eq          : eq;
   let_rec_rhs : expr
 }
@@ -156,7 +161,7 @@ and type_expr =
 | TRecord of record_type
 | TApp    of (type_constr * type_tuple) reg
 | TPar    of type_expr par reg
-| TAlias  of variable
+| TPath   of path reg
 | TFun    of fun_type reg
 
 and fun_type = {
@@ -170,9 +175,8 @@ and type_tuple = type_expr csv par
 and cartesian = (type_expr, mult) Utils.nsepseq
 
 and variant = {
-  constr  : constr;
-  kwd_of  : kwd_of;
-  product : cartesian
+  constr : constr;
+  args   : (kwd_of * cartesian) option
 }
 
 and record_type = field_decl reg injection reg
@@ -195,15 +199,22 @@ and pattern =
 | Plist   of pattern ssv brackets reg
 | Pvar    of variable
 | Punit   of the_unit reg
-| Pint    of Z.t reg
+| Pint    of (string * Z.t) reg
 | Ptrue   of kwd_true
 | Pfalse  of kwd_false
 | Pstr    of string reg
 | Pwild   of wild
 | Pcons   of (pattern * cons * pattern) reg
 | Ppar    of pattern par reg
-| Pconstr of (constr * pattern reg) reg
+| Pconstr of (constr * pattern reg option) reg
 | Precord of record_pattern
+| Ptyped  of typed_pattern reg
+
+and typed_pattern = {
+  pattern   : pattern;
+  colon     : colon;
+  type_expr : type_expr
+}
 
 and record_pattern = field_pattern reg injection reg
 
@@ -222,45 +233,54 @@ and expr =
 | Match    of match_expr reg
 | Seq      of sequence reg
 | Record   of record_expr
-  (* TODO: selection in a record *)
 
-| Cat     of (expr * cat * expr) reg
-| Cons    of (expr * cons * expr) reg
+| Cat      of (expr * cat * expr) reg
+| Append   of (expr * append * expr) reg
+| Cons     of (expr * cons * expr) reg
 
-| Or      of (expr * bool_or * expr) reg
-| And     of (expr * bool_and * expr) reg
+| Or       of (expr * bool_or * expr) reg
+| And      of (expr * bool_and * expr) reg
 
-| Lt      of (expr * lt * expr) reg
-| LEq     of (expr * le * expr) reg
-| Gt      of (expr * gt * expr) reg
-| GEq     of (expr * ge * expr) reg
-| NEq     of (expr * ne * expr) reg
-| Eq      of (expr * eq * expr) reg
+| Lt       of (expr * lt * expr) reg
+| LEq      of (expr * le * expr) reg
+| Gt       of (expr * gt * expr) reg
+| GEq      of (expr * ge * expr) reg
+| NEq      of (expr * ne * expr) reg
+| Eq       of (expr * eq * expr) reg
 
-| Add     of (expr * plus   * expr) reg
-| Sub     of (expr * minus  * expr) reg
+| Add      of (expr * plus   * expr) reg
+| Sub      of (expr * minus  * expr) reg
 
-| Mult    of (expr * mult    * expr) reg
-| Div     of (expr * div     * expr) reg
-| Mod     of (expr * kwd_mod * expr) reg
+| Mult     of (expr * mult    * expr) reg
+| Div      of (expr * div     * expr) reg
+| Mod      of (expr * kwd_mod * expr) reg
 
-| Neg     of (minus   * expr) reg
-| Not     of (kwd_not * expr) reg
+| Neg      of (minus   * expr) reg
+| Not      of (kwd_not * expr) reg
 
-| Call    of (expr * expr) reg
+| Call     of (expr * expr) reg
 
-| Int     of Z.t reg
-| Path    of path
-| Str     of string reg
-| Unit    of the_unit reg
-| True    of kwd_true
-| False   of kwd_false
-| Par     of expr par reg
-| List    of expr ssv brackets reg
-| Constr  of constr
-| Extern  of extern
+| Int      of (string * Z.t) reg
+| Mtz      of (string * Z.t) reg
+| Pos      of (string * Z.t) reg
+| Path     of path reg
+| Str      of string reg
+| Unit     of the_unit reg
+| True     of kwd_true
+| False    of kwd_false
+| Par      of expr par reg
+| List     of expr ssv brackets reg
+| Constr   of constr
+| Extern   of extern
 
-and path = (ident, dot) Utils.nsepseq reg
+and path = {
+  module_proj : (constr * dot) option;
+  value_proj  : (selection, dot) Utils.nsepseq
+}
+
+and selection =
+  Name      of ident
+| Component of (string * Z.t) par reg
 
 and record_expr = field_assignment reg injection reg
 
@@ -278,7 +298,7 @@ and sequence = {
 
 and match_expr = kwd_match * expr * kwd_with * cases
 
-and cases = (pattern * arrow * expr) bsv
+and cases = vbar option * (pattern * arrow * expr) bsv
 
 and let_in = kwd_let * let_bindings * kwd_in * expr
 
@@ -345,6 +365,8 @@ let rec to_string (statements,_) =
 and statement_to_string = function
   Let {value=_,let_bindings; _} ->
     sprintf "Let %s" (let_bindings_to_string let_bindings)
+| LetEntry {value=_,let_binding; _} ->
+    sprintf "Let%%entry %s" (let_binding_to_string let_binding)
 | LetRec {value=_,_,let_rec_bindings; _} ->
     sprintf "LetRec %s" (let_rec_bindings_to_string let_rec_bindings)
 | TypeDecl {value=type_decl; _} ->
@@ -378,7 +400,7 @@ and type_expr_to_string = function (* TODO *)
 | TRecord record -> ""
 | TApp {value = type_constr, args; _} -> ""
 | TPar {value = {inside=type_expr;_}; _} -> ""
-| TAlias {value=var;_} -> ""
+| TPath {value=var;_} -> ""
 | TFun _ -> ""
 
 and cartesian_to_string (_, product) =
@@ -390,7 +412,9 @@ and expr_to_string = function
 |      Tuple {value;_} -> tuple_to_string (expr_to_string) value
 |      Match {value;_} -> match_expr_to_string value
 |             Fun expr -> fun_expr_to_string expr
-|        Int {value;_} -> Z.to_string value
+| Int {value=lex,_; _} -> lex
+| Mtz {value=lex,_; _} -> lex
+| Pos {value=lex,_; _} -> lex
 |       Path {value;_} -> path_to_string value
 |        Str {value;_} -> sprintf "\"%s\"" value
 |              False _ -> "false"
@@ -404,6 +428,8 @@ and expr_to_string = function
 |              If cond -> cond_to_string cond
 | Cat {value=arg1,_,arg2;_} ->
     sprintf "%s ^ %s" (expr_to_string arg1) (expr_to_string arg2)
+| Append {value=arg1,_,arg2;_} ->
+    sprintf "%s @ %s" (expr_to_string arg1) (expr_to_string arg2)
 | Cons {value=hd,_,tl;_} ->
     sprintf "%s::%s"(expr_to_string hd) (expr_to_string tl)
 | Or {value=e1,_,e2;_} ->
@@ -449,7 +475,7 @@ and cond_to_string = function
 and match_expr_to_string (_,expr,_,cases) =
   sprintf "Match (%s, %s)" (expr_to_string expr) (cases_to_string cases)
 
-and cases_to_string cases =
+and cases_to_string (_,cases) =
   let apply case acc =
     let str = case_to_string case in
     if acc = "" then str else sprintf "%s\n| %s" acc str
@@ -475,7 +501,7 @@ and pattern_to_string = function
 | Pvar {value;_}        -> value
 | Ppar {value={inside=p;_};_} -> sprintf "(%s)" (pattern_to_string p)
 | Punit _             -> "()"
-| Pint {value;_}          -> Z.to_string value
+| Pint {value=lex,_; _} -> lex
 | Ptrue _             -> "true"
 | Pfalse _            -> "false"
 | Pstr {value;_}          -> sprintf "\"%s\"" value
@@ -520,7 +546,8 @@ let region_of_expr = function
 | Add {region;_} | Sub {region;_}
 | Mult {region;_} | Div {region;_} | Mod {region;_}
 | Neg {region;_} | Not {region;_} | Call {region;_}
-| Int {region;_} | Path {region;_} | Str {region;_}
+| Int {region;_} | Mtz {region; _} | Pos {region; _}
+| Path {region;_} | Str {region;_}
 | Unit {region;_} | True region | False region
 | Par {region;_} | List {region;_} -> region
 | Extern _ -> Region.ghost
@@ -559,8 +586,11 @@ let norm_fun region kwd_fun pattern eq expr =
       Pvar v -> kwd_fun, v, eq, expr
     |      _ -> let value     = Utils.gen_sym () in
                 let fresh    = Region.{region=Region.ghost; value} in
-                let path     = Region.{region=Region.ghost; value=fresh,[]} in
-                let bindings = {pattern; eq; let_rhs = Path path}, [] in
+                let proj     = Name fresh, [] in
+                let path     = {module_proj=None; value_proj=proj} in
+                let path     = Region.{region=Region.ghost; value=path} in
+                let bindings = {pattern; eq;
+                                lhs_type=None; let_rhs = Path path}, [] in
                 let let_in   = ghost_let, bindings, ghost_in, expr in
                 let expr     = LetIn {value=let_in; region=Region.ghost}
     in kwd_fun, fresh, ghost_arrow, expr
@@ -643,6 +673,9 @@ and print_statement undo = function
   Let {value=kwd_let, let_bindings; _} ->
     print_token kwd_let "let";
     print_let_bindings undo let_bindings
+| LetEntry {value=kwd_let_entry, let_binding; _} ->
+    print_token kwd_let_entry "let%entry";
+    print_let_binding undo let_binding
 | LetRec {value=kwd_let, kwd_rec, let_rec_bindings; _} ->
     print_token kwd_let "let";
     print_token kwd_rec "rec";
@@ -650,8 +683,13 @@ and print_statement undo = function
 
 and print_let_bindings undo = print_nsepseq "and" (print_let_binding undo)
 
-and print_let_binding undo {pattern; eq; let_rhs} =
+and print_let_binding undo {pattern; lhs_type; eq; let_rhs} =
   print_pattern pattern;
+  (match lhs_type with
+     None -> ()
+   | Some (colon, type_expr) ->
+       print_token colon ": <type_expr>"
+       (*print_type_expr type_expr*) ); (* XXX *)
   if undo then
     match unparse let_rhs with
       `Let (patterns, eq, e) ->
@@ -672,7 +710,8 @@ and print_let_rec_bindings undo bindings =
   print_nsepseq "and" (print_let_rec_binding undo) bindings
 
 and print_let_rec_binding undo {pattern=var; eq; let_rec_rhs} =
-  let binding = {pattern = Pvar var; eq; let_rhs = let_rec_rhs}
+  let binding = {pattern = Pvar var; eq; lhs_type=None; (* TODO: type_lhs *)
+                 let_rhs = let_rec_rhs}
   in print_let_binding undo binding
 
 and print_pattern = function
@@ -685,8 +724,8 @@ and print_pattern = function
     Printf.printf "%s: Pvar %s\n" (region#compact `Byte) value
 | Punit {value=lpar,rpar; _} ->
     print_token lpar "("; print_token rpar ")"
-| Pint {region;value} ->
-    print_token region (sprintf "Int %s" (Z.to_string value))
+| Pint {region; value=lex,z} ->
+    print_token region (sprintf "Pint %s (%s)" lex (Z.to_string z))
 | Ptrue kwd_true -> print_token kwd_true "true"
 | Pfalse kwd_false -> print_token kwd_false "false"
 | Pstr s -> print_str s
@@ -743,7 +782,12 @@ and print_expr undo = function
 | Neg {value=minus,e; _} -> print_token minus "-"; print_expr undo e
 | Not {value=kwd_not,e; _} -> print_token kwd_not "not"; print_expr undo e
 | Call {value=e1,e2; _} -> print_expr undo e1; print_expr undo e2
-| Int {region; value} -> print_token region (sprintf "Int %s" (Z.to_string value))
+| Int {region; value=lex,z} ->
+    print_token region (sprintf "Int %s (%s)" lex (Z.to_string z))
+| Mtz {region; value=lex,z} ->
+    print_token region (sprintf "Mtz %s (%s)" lex (Z.to_string z))
+| Pos {region; value=lex,z} ->
+    print_token region (sprintf "Pos %s (%s)" lex (Z.to_string z))
 | Path p -> print_path p
 | Str s -> print_str s
 | Unit {value=lpar,rpar; _} ->
@@ -758,7 +802,7 @@ and print_expr undo = function
 
 and print_path path = failwith "AST.print_path: TODO"
 
-and print_match_expr undo (kwd_match, expr, kwd_with, cases) =
+and print_match_expr undo (kwd_match, expr, kwd_with, (_,cases)) =
   print_token kwd_match "match";
   print_expr undo expr;
   print_token kwd_with "with";
@@ -827,6 +871,7 @@ let rec vars env (statements,_) =
 
 and fv_statement state = function
   Let    {value=_, bindings; _}   -> fv_let_bindings state bindings
+| LetEntry {value=_, binding; _}   -> fv_let_bindings state (binding,[])
 | LetRec {value =_,_,bindings; _} -> fv_let_rec_bindings state bindings
 
 and fv_let_bindings (env, _ as state) bindings =
@@ -881,7 +926,8 @@ and fv_expr env fv = function
 (*|  Var v -> if Vars.mem v.value env then fv else FreeVars.add v fv*)
 | Path p -> failwith "AST.fv_expr: TODO"
 | List {value={inside=l;_}; _} -> Utils.sepseq_foldl (fv_expr env) fv l
-| Int _ | Str _ | Unit _ | True _ | False _ | Extern _ -> fv
+| Int _ | Mtz _ | Pos _
+| Str _ | Unit _ | True _ | False _ | Extern _ -> fv
 
 and fv_cond env fv = function
   IfThenElse {value=_,e1,_,e2,_,e3; _} ->

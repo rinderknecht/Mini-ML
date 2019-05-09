@@ -6,6 +6,7 @@ type t =
   ARROW    (* "->" *)
 | CONS     (* "::" *)
 | CAT      (* "^"  *)
+| APPEND   (* "@"  *)
 
   (* Arithmetics *)
 
@@ -51,7 +52,9 @@ type t =
 
 | Ident  of string
 | Constr of string
-| Int    of Z.t
+| Int    of (string * Z.t)
+| Pos    of (string * Z.t)
+| Mtz    of (string * Z.t)
 | Str    of string
 
   (* Keywords *)
@@ -71,12 +74,14 @@ type t =
 | Mod
 | Not
 | Of
+| Or
 | Rec
 | Set
 | Then
 | True
 | Type
 | With
+| LetEntry
 
   (* Virtual tokens *)
 

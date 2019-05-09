@@ -27,6 +27,7 @@ type kwd_fun   = Region.t
 type kwd_if    = Region.t
 type kwd_in    = Region.t
 type kwd_let   = Region.t
+type kwd_let_entry = Region.t
 type kwd_match = Region.t
 type kwd_mod   = Region.t
 type kwd_not   = Region.t
@@ -39,10 +40,11 @@ type kwd_with  = Region.t
 
 (* Symbols *)
 
-type arrow = Region.t                                                (* "->" *)
-type cons  = Region.t                                                (* "::" *)
-type cat   = Region.t                                                (* "^"  *)
-type dot   = Region.t                                                (* "."  *)
+type arrow  = Region.t                                               (* "->" *)
+type cons   = Region.t                                               (* "::" *)
+type cat    = Region.t                                               (* "^"  *)
+type append = Region.t                                               (* "@"  *)
+type dot    = Region.t                                               (* "."  *)
 
 (* Arithmetic operators *)
 
@@ -136,6 +138,8 @@ and eof = Region.t
 and statement =
                                                     (* let p = e and ...     *)
   Let      of (kwd_let * let_bindings) reg
+                                                    (* let%entry p = e and ... *)
+| LetEntry of (kwd_let_entry * let_binding) reg
                                                     (* let rec p = e and ... *)
 | LetRec   of (kwd_let * kwd_rec * let_rec_bindings) reg
 | TypeDecl of type_decl reg                                     (* type .... *)
@@ -145,10 +149,11 @@ and statement =
 and let_bindings =
   (let_binding, kwd_and) Utils.nsepseq            (* p1 = e1 and p2 = e2 ... *)
 
-and let_binding = {                                                 (* p = e *)
-  pattern : pattern;
-  eq      : eq;
-  let_rhs : expr
+and let_binding = {                                    (* p = e   p : t = e *)
+  pattern  : pattern;
+  lhs_type : (colon * type_expr) option;
+  eq       : eq;
+  let_rhs  : expr
 }
 
 (* Recursive values *)
@@ -157,6 +162,7 @@ and let_rec_bindings = (let_rec_binding,  kwd_and) Utils.nsepseq
 
 and let_rec_binding  = {
   pattern     : variable;
+  lhs_type    : (colon * type_expr) option;
   eq          : eq;
   let_rec_rhs : expr
 }
@@ -171,7 +177,7 @@ and type_expr =
 | TRecord of record_type
 | TApp    of (type_constr * type_tuple) reg
 | TPar    of type_expr par reg
-| TAlias  of variable
+| TPath   of path reg
 | TFun    of fun_type reg
 
 and fun_type = {
@@ -185,9 +191,8 @@ and type_tuple = type_expr csv par
 and cartesian = (type_expr, mult) Utils.nsepseq
 
 and variant = {
-  constr  : constr;
-  kwd_of  : kwd_of;
-  product : cartesian
+  constr : constr;
+  args   : (kwd_of * cartesian) option
 }
 
 and record_type = field_decl reg injection reg
@@ -210,15 +215,22 @@ and pattern =
 | Plist   of pattern ssv brackets reg                       (* [p1; p2; ...] *)
 | Pvar    of variable                                       (*             x *)
 | Punit   of the_unit reg                                   (*            () *)
-| Pint    of Z.t reg                                        (*             7 *)
+| Pint    of (string * Z.t) reg                             (*             7 *)
 | Ptrue   of kwd_true                                       (*          true *)
 | Pfalse  of kwd_false                                      (*         false *)
 | Pstr    of string reg                                     (*         "foo" *)
 | Pwild   of wild                                           (*             _ *)
 | Pcons   of (pattern * cons * pattern) reg                 (*      p1 :: p2 *)
 | Ppar    of pattern par reg                                (*           (p) *)
-| Pconstr of (constr * pattern reg) reg                     (*    A B (3,"") *)
-| Precord of record_pattern                                 (* {a=... ; ...} *)
+| Pconstr of (constr * pattern reg option) reg              (*    A B(3,"")  *)
+| Precord of record_pattern                                 (*  {a=...; ...} *)
+| Ptyped  of typed_pattern reg                              (*     (x : int) *)
+
+and typed_pattern = {
+  pattern   : pattern;
+  colon     : colon;
+  type_expr : type_expr
+}
 
 and record_pattern = field_pattern reg injection reg
 
@@ -236,9 +248,10 @@ and expr =
 | Tuple    of expr csv reg     (* e1, e2, ...                                *)
 | Match    of match_expr reg   (* p1 -> e1 | p2 -> e2 | ...                  *)
 | Seq      of sequence reg     (* begin e1; e2; ... ; en end                 *)
-| Record   of record_expr      (* {f1=e1; ... } *)
+| Record   of record_expr      (* {f1=e1; ... }                              *)
 
 | Cat     of (expr * cat * expr) reg                             (* e1  ^ e2 *)
+| Append  of (expr * append * expr) reg                          (* e1  @ e2 *)
 | Cons    of (expr * cons * expr) reg                            (* e1 :: e2 *)
 
 | Or      of (expr * bool_or * expr) reg                         (* e1 || e2 *)
@@ -263,8 +276,10 @@ and expr =
 
 | Call    of (expr * expr) reg                                        (* f e *)
 
-| Int     of Z.t reg                                        (* 12345         *)
-| Path    of path                                           (* x x.y.z       *)
+| Int     of (string * Z.t) reg                             (* 12345         *)
+| Mtz     of (string * Z.t) reg                             (* 1.00tz 3tz    *)
+| Pos     of (string * Z.t) reg                             (* 3p            *)
+| Path    of path reg                                       (* x x.y.z       *)
 | Str     of string reg                                     (* "foo"         *)
 | Unit    of the_unit reg                                   (* ()            *)
 | True    of kwd_true                                       (* true          *)
@@ -274,7 +289,14 @@ and expr =
 | Constr  of constr
 | Extern  of extern
 
-and path = (ident, dot) Utils.nsepseq reg
+and path = {
+  module_proj : (constr * dot) option;
+  value_proj  : (selection, dot) Utils.nsepseq
+}
+
+and selection =
+  Name      of ident
+| Component of (string * Z.t) par reg
 
 and record_expr = field_assignment reg injection reg
 
@@ -292,7 +314,7 @@ and sequence = {
 
 and match_expr = kwd_match * expr * kwd_with * cases
 
-and cases = (pattern * arrow * expr) bsv
+and cases = vbar option * (pattern * arrow * expr) bsv
 
 and let_in = kwd_let * let_bindings * kwd_in * expr
 

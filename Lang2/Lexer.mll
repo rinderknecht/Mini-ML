@@ -8,6 +8,22 @@
 let sprintf = Printf.sprintf
 module SMap = Utils.String.Map
 
+(* Making a natural from its decimal notation (for Tez) *)
+
+let format_tz s =
+  match String.index s '.' with
+    index ->
+      let len         = String.length s in
+      let integral    = Str.first_chars s index
+      and fractional  = Str.last_chars s (len-index-1) in
+      let num         = Z.of_string (integral ^ fractional)
+      and den         = Z.of_string ("1" ^ String.make (len-index-1) '0')
+      and million     = Q.of_string "1000000" in
+      let mtz         = Q.make num den |> Q.mul million in
+      let should_be_1 = Q.den mtz in
+      if Z.equal Z.one should_be_1 then Some (Q.num mtz) else None
+  | exception Not_found -> assert false
+
 (* STRING PROCESSING *)
 
 (* The value of [mk_str len p] ("make string") is a string of length
@@ -73,6 +89,8 @@ let keywords = Token.[
   "match",  Some Match;
   "mod",    Some Mod;
   "not",    Some Not;
+  "of",     Some Of;
+  "or",     Some Or;
   "rec",    Some Rec;
   "then",   Some Then;
   "true",   Some True;
@@ -111,7 +129,6 @@ let keywords = Token.[
   "nonrec",      None;
   "object",      None;
   "open",        None;
-  "or",          None;
   "private",     None;
   "sig",         None;
   "struct",      None;
@@ -172,6 +189,7 @@ let blank    = [' ' '\t']
 let digit    = ['0'-'9']
 let natural  = digit | digit (digit | '_')* digit
 let integer  = '-'? natural
+let decimal  = digit+ '.' digit+
 
 let small    = ['a'-'z']
 let capital  = ['A'-'Z']
@@ -197,11 +215,12 @@ let char     = "'" char_set "'"
 
 rule scan = parse
   nl     { Lexing.new_line lexbuf; scan lexbuf }
-| blank+ { scan lexbuf }
+| blank+ { scan lexbuf    }
 
 | "->"   { Token.ARROW    }
 | "::"   { Token.CONS     }
 | "^"    { Token.CAT      }
+| "@"    { Token.APPEND   }
 
 | "="    { Token.EQ       }
 | "<>"   { Token.NE       }
@@ -234,8 +253,17 @@ rule scan = parse
 | "_"    { Token.WILD     }
 | eof    { Token.EOF      }
 
-| integer as n  { Token.Int (Z.of_string n) }
-| uident  as id { Token.Constr id           }
+| integer as n       { Token.Int (n, Z.of_string n)          }
+| integer as n "p"   { Token.Pos (n ^ "p", Z.of_string n)    }
+| integer as tz "tz" { Token.Mtz (tz ^ "tz", Z.of_string tz) }
+| decimal as tz "tz" {
+    match format_tz tz with
+      Some z -> Token.Mtz (tz ^ "tz", z)
+    | None   -> sprintf "Invalid tez value." |> error lexbuf   }
+
+| uident  as id { Token.Constr id              }
+| "let%init"    { Token.Let                    }
+| "let%entry"   { Token.LetEntry               }
 | ident   as id {
     match SMap.find id kwd_map with
       None -> sprintf "Reserved name \"%s\"." id |> error lexbuf

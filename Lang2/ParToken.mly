@@ -18,6 +18,7 @@
 %token ARROW
 %token CONS
 %token CAT
+%token APPEND
 %token DOT
 
 %token COMMA
@@ -41,7 +42,9 @@
 %token <string> Constr
 %token <string> Str
 
-%token <Z.t> Int
+%token <string * Z.t> Int
+%token <string * Z.t> Mtz
+%token <string * Z.t> Pos
 
 %token And
 %token Begin
@@ -58,12 +61,14 @@
 %token Mod
 %token Not
 %token Of
+%token Or
 %token Rec
 %token Set
 %token Then
 %token True
 %token Type
 %token With
+%token LetEntry
 
 %token EOF
 

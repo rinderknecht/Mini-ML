@@ -109,10 +109,12 @@ sepseq(item,sep):
   (**)              {    None }
 | nsepseq(item,sep) { Some $1 }
 
-(* Inlined *)
+(* Helpers *)
 
-type_name  : ident { $1 }
-field_name : ident { $1 }
+type_name   : ident  { $1 }
+field_name  : ident  { $1 }
+module_name : constr { $1 }
+struct_name : Ident { $1 }
 
 (* Non-empty comma-separated values (at least two values) *)
 
@@ -131,6 +133,7 @@ program:
 
 statement:
   reg(kwd(Let)          let_bindings     {$1,$2})       {      Let $1 }
+| reg(kwd(LetEntry)     let_binding      {$1,$2})       { LetEntry $1 }
 | reg(kwd(Let) kwd(Rec) let_rec_bindings {$1,$2,$3})    {   LetRec $1 }
 | reg(type_decl)                                        { TypeDecl $1 }
 
@@ -155,8 +158,8 @@ arrow_type:
   core_type sym(ARROW) fun_type     { {domain=$1; arrow=$2; range=$3} }
 
 core_type:
-  type_name {
-    TAlias $1
+  reg(path) {
+    TPath $1
   }
 | reg(core_type type_constr {$1,$2}) {
     let arg, constr = $1.value in
@@ -182,19 +185,20 @@ type_tuple:
   par(tuple(type_expr)) { $1 }
 
 sum_type:
-  nsepseq(reg(variant), sym(VBAR)) { $1 }
+  ioption(sym(VBAR)) nsepseq(reg(variant), sym(VBAR)) { $2 }
 
 variant:
-  constr kwd(Of) cartesian { {constr=$1; kwd_of=$2; product=$3} }
+  constr kwd(Of) cartesian { {constr=$1; args = Some ($2,$3)} }
+| constr                   { {constr=$1; args=None} }
 
 record_type:
   sym(LBRACE) sep_or_term_list(reg(field_decl),sym(SEMI))
   sym(RBRACE) {
-    let elements, terminator = $2 in
-    {opening = $1;
-     elements = Some elements;
-     terminator;
-     closing = $3} }
+    let elements, terminator = $2 in {
+      opening = $1;
+      elements = Some elements;
+      terminator;
+      closing = $3} }
 
 field_decl:
   field_name sym(COLON) type_expr {
@@ -206,12 +210,12 @@ let_rec_bindings:
   nsepseq(let_rec_binding, kwd(And)) { $1 }
 
 let_rec_binding:
-  ident nseq(sub_irrefutable) sym(EQ) expr {
-    {pattern = $1; eq = Region.ghost;
-     let_rec_rhs = Fun (norm $2 $3 $4)}
+  ident nseq(sub_irrefutable) option(type_annotation) sym(EQ) expr {
+    {pattern = $1; eq = Region.ghost; lhs_type = $3;
+     let_rec_rhs = Fun (norm $2 $4 $5)}
   }
-| ident sym(EQ) fun_expr(expr) {
-    {pattern = $1; eq = $2; let_rec_rhs = $3} }
+| ident option(type_annotation) sym(EQ) fun_expr(expr) {
+    {pattern=$1; lhs_type=$2; eq=$3; let_rec_rhs=$4} }
 
 (* Non-recursive definitions *)
 
@@ -219,12 +223,15 @@ let_bindings:
   nsepseq(let_binding, kwd(And)) { $1 }
 
 let_binding:
-  ident nseq(sub_irrefutable) sym(EQ) expr {
-    let let_rhs = Fun (norm $2 $3 $4) in
-    {pattern = Pvar $1; eq = Region.ghost; let_rhs}
+  ident nseq(sub_irrefutable) option(type_annotation) sym(EQ) expr {
+    let let_rhs = Fun (norm $2 $4 $5) in
+    {pattern = Pvar $1; lhs_type=$3; eq = Region.ghost; let_rhs}
   }
-| irrefutable sym(EQ) expr {
-    {pattern=$1; eq=$2; let_rhs=$3} }
+| irrefutable option(type_annotation) sym(EQ) expr {
+    {pattern=$1; lhs_type=$2; eq=$3; let_rhs=$4} }
+
+type_annotation:
+  sym(COLON) type_expr { $1,$2 }
 
 (* Patterns *)
 
@@ -239,8 +246,14 @@ sub_irrefutable:
 | reg(par(closed_irrefutable))                           {    Ppar $1 }
 
 closed_irrefutable:
-  reg(tuple(sub_irrefutable))                            {  Ptuple $1 }
-| sub_irrefutable                                        {         $1 }
+  reg(tuple(sub_irrefutable))                           {   Ptuple $1 }
+| sub_irrefutable                                       {          $1 }
+| reg(constr_pattern)                                   {  Pconstr $1 }
+| reg(typed_pattern)                                    {   Ptyped $1 }
+
+typed_pattern:
+  irrefutable sym(COLON) type_expr {
+    {pattern=$1; colon=$2; type_expr=$3} }
 
 pattern:
   reg(sub_pattern sym(CONS) tail {$1,$2,$3})             {   Pcons $1 }
@@ -279,7 +292,8 @@ field_pattern:
     {field_name=$1; eq=$2; pattern=$3} }
 
 constr_pattern:
-  constr reg(sub_pattern)                                {      $1,$2 }
+  constr reg(sub_pattern)                          {      $1, Some $2 }
+| constr                                           {      $1, None    }
 
 ptuple:
   reg(tuple(tail))                                       {  Ptuple $1 }
@@ -333,8 +347,9 @@ closed_if:
 | match_expr(base_if_then_else)                            { Match $1 }
 
 match_expr(right_expr):
-  reg(kwd(Match) expr kwd(With) cases(right_expr) {
-    $1,$2,$3, Utils.nsepseq_rev $4 })                            { $1 }
+  reg(kwd(Match) expr kwd(With)
+        option(sym(VBAR)) cases(right_expr) {
+          $1,$2,$3, ($4, Utils.nsepseq_rev $5) })                { $1 }
 
 cases(right_expr):
   case(right_expr)                                           { $1, [] }
@@ -359,6 +374,7 @@ fun_expr(right_expr):
 
 disj_expr:
   reg(disj_expr sym(BOOL_OR) conj_expr {$1,$2,$3})         {    Or $1 }
+| reg(disj_expr kwd(Or) conj_expr {$1,$2,$3})              {    Or $1 }
 | conj_expr                                                {       $1 }
 
 conj_expr:
@@ -376,6 +392,7 @@ comp_expr:
 
 cat_expr:
   reg(cons_expr sym(CAT) cat_expr {$1,$2,$3})              {   Cat $1 }
+| reg(cons_expr sym(APPEND) cat_expr {$1,$2,$3})           { Append $1 }
 | cons_expr                                                {       $1 }
 
 cons_expr:
@@ -404,6 +421,8 @@ call_expr:
 
 core_expr:
   reg(Int)                                                {    Int $1 }
+| reg(Mtz)                                                {    Mtz $1 }
+| reg(Pos)                                                {    Pos $1 }
 | reg(path)                                               {   Path $1 }
 | string                                                  {    Str $1 }
 | unit                                                    {   Unit $1 }
@@ -416,7 +435,20 @@ core_expr:
 | reg(record_expr)                                        { Record $1 }
 
 path:
-  nsepseq(ident, sym(DOT)) { $1 }
+  reg(struct_name) sym(DOT) nsepseq(selection,sym(DOT)) {
+    let head, tail = $3 in
+    let seq = Name $1, ($2,head)::tail
+    in {module_proj=None; value_proj=seq}
+  }
+| module_name sym(DOT) nsepseq(selection,sym(DOT)) {
+    {module_proj = Some ($1,$2); value_proj=$3}
+  }
+| ident {
+    {module_proj = None; value_proj = Name $1, []} }
+
+selection:
+  ident         {      Name $1 }
+| reg(par(Int)) { Component $1 }
 
 record_expr:
   sym(LBRACE)

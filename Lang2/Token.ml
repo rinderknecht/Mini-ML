@@ -6,6 +6,7 @@ type t =
   ARROW
 | CONS
 | CAT
+| APPEND
 | MINUS
 | PLUS
 | SLASH
@@ -35,10 +36,12 @@ type t =
 
 | Ident  of string
 | Constr of string
-| Int    of Z.t
+| Int    of (string * Z.t)
+| Pos    of (string * Z.t)
+| Mtz    of (string * Z.t)
 | Str    of string
 
-(* Some keywords of OCaml *)
+(* Keywords *)
 
 | And
 | Begin
@@ -55,12 +58,14 @@ type t =
 | Mod
 | Not
 | Of
+| Or
 | Rec
 | Set
 | Then
 | True
 | Type
 | With
+| LetEntry
 
 (* Virtual tokens *)
 
@@ -72,6 +77,7 @@ let to_string = function
   ARROW    -> "->"
 | CONS     -> "::"
 | CAT      -> "^"
+| APPEND   -> "@"
 | MINUS    -> "-"
 | PLUS     -> "+"
 | SLASH    -> "/"
@@ -98,7 +104,9 @@ let to_string = function
 | BOOL_AND -> "&&"
 | Ident id -> Printf.sprintf "Ident %s"   id
 | Constr id -> Printf.sprintf "Constr %s" id
-| Int n    -> Printf.sprintf "Int %s"     (Z.to_string n)
+| Int (lex,z) -> Printf.sprintf "Int %s (%s)" lex (Z.to_string z)
+| Pos (lex,z) -> Printf.sprintf "Pos %s (%s)" lex (Z.to_string z)
+| Mtz (lex,z) -> Printf.sprintf "Mtz %s (%s)" lex (Z.to_string z)
 | Str n    -> Printf.sprintf "Str \"%s\"" n
 | And      -> "and"
 | Begin    -> "begin"
@@ -115,10 +123,12 @@ let to_string = function
 | Mod      -> "mod"
 | Not      -> "not"
 | Of       -> "of"
+| Or       -> "or"
 | Rec      -> "rec"
 | Set      -> "set"
 | Then     -> "then"
 | True     -> "true"
 | Type     -> "type"
 | With     -> "with"
+| LetEntry -> "let%entry"
 | EOF      -> "EOF"
