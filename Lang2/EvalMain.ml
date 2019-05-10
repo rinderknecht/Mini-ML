@@ -20,11 +20,14 @@ let internal text =
 let external_ text =
   Utils.highlight (sprintf "External error: %s" text); exit 2
 
+(* Reading the command-line options *)
+
+let options = EvalOpt.read ()
 
 (* Path to the Mini-ML standard library *)
 
 let lib_path =
-  match EvalOpt.libs with
+  match options.libs with
       [] -> ""
   | libs -> let mk_I dir path = sprintf " -I %s%s" dir path
            in List.fold_right mk_I libs ""
@@ -33,7 +36,7 @@ let lib_path =
 (* Opening the input channel and setting the lexing engine *)
 
 let cin, reset =
-  match EvalOpt.input with
+  match options.input with
     None | Some "-" -> stdin, fun ?(line=1) _buffer -> ignore line
   |       Some file -> open_in file, Lexer.reset ~file
 
@@ -43,7 +46,7 @@ let     () = reset buffer
 (* Tokeniser *)
 
 let tokeniser =
-  if Utils.String.Set.mem "lexer" EvalOpt.verbose then
+  if Utils.String.Set.mem "lexer" options.verbose then
     Lexer.get_token ~log:(stdout, Lexer.output_token buffer)
   else Lexer.get_token ?log:None
 
@@ -67,8 +70,8 @@ let () =
 
     (* Optional pretty-printing of tokens after parsing *)
 
-    let () = if Utils.String.Set.mem "parser" EvalOpt.verbose then
-               if Utils.String.Set.mem "unparsing" EvalOpt.verbose then
+    let () = if Utils.String.Set.mem "parser" options.verbose then
+               if Utils.String.Set.mem "unparsing" options.verbose then
                  AST.print_tokens ~undo:true ast
                else AST.print_tokens ast in
 
@@ -85,7 +88,7 @@ let () =
     (* Interpreting the Mini-ML source code *)
 
     let () =
-      if EvalOpt.eval then
+      if options.eval then
         (* Interpreting the Abstract Syntax Tree *)
 
         ignore (Eval.eval ast) in
@@ -93,14 +96,14 @@ let () =
     (* Compiling Mini-ML to OCaml *)
 
     let () =
-      match EvalOpt.compile with
+      match options.compile with
              None -> ()
       | Some file ->
          let open Compile in
          let input =
-           match EvalOpt.input with
+           match options.input with
              Some file_path -> file_path
-           | None -> assert false in (* "-c" implies an input file ([EvalOpt]) *)
+           | None -> assert false in (* "-c" implies an input file ([options]) *)
           let state = {
             trans = Trans.Id;
             input = Filename.basename input
@@ -109,7 +112,7 @@ let () =
           let edit =
              TEdit.compile
           @@ get_edit
-          @@ edit_ast ~verb:EvalOpt.verbose ast
+          @@ edit_ast ~verb:options.verbose ast
             (state, TEdit.stop) in
 
           (* I/O maps *)
@@ -122,17 +125,17 @@ let () =
           (* Optionally adding the runtime environment (RTE) edits *)
 (*
           let io, edits =
-            if EvalOpt.rte then
+            if options.rte then
               let ml_rte =
                 let open Filename in
                   sprintf "%s%s%sRTE.ml"
                    (dirname file) dir_sep (remove_extension file |> basename) in
 
-              Edit.add Compile.RTE ~in_:EvalOpt.input ~out:ml_rte io,
+              Edit.add Compile.RTE ~in_:options.input ~out:ml_rte io,
               let open Compile in
               let state = {state with trans = RTE} in
               let edit_rte =
-                (if EvalOpt.tco then Edit.compile_cps else Edit.compile)
+                (if options.tco then Edit.compile_cps else Edit.compile)
               @@ get_edit
               @@ add_out_channels
               @@ add_error_printing
@@ -143,7 +146,7 @@ let () =
 *)
           (* Checking all edits *)
 
-          let () = if Utils.String.Set.mem "editor" EvalOpt.verbose then
+          let () = if Utils.String.Set.mem "editor" options.verbose then
                     (print_endline "\nEDITS"; TEdit.show io edits) in
 
           let check edit =
@@ -162,10 +165,10 @@ let () =
           (* Optimising the edits *)
 
           let desc, edits =
-            TEdit.build ~opt:(not EvalOpt.raw_edits) io edits in
+            TEdit.build ~opt:(not options.raw_edits) io edits in
 
-          let () = if Utils.String.Set.mem "editor" EvalOpt.verbose
-                   && not EvalOpt.raw_edits
+          let () = if Utils.String.Set.mem "editor" options.verbose
+                   && not options.raw_edits
                    then (print_endline "\nOPTIMISED EDITS";
                          TEdit.show io edits) in
 
