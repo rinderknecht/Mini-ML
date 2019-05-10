@@ -65,7 +65,15 @@ type t =
 | True
 | Type
 | With
+
 | LetEntry
+| MatchNat
+
+(*
+| Contract
+| Sig
+| Struct
+*)
 
 (* Virtual tokens *)
 
@@ -131,4 +139,5 @@ let to_string = function
 | Type     -> "type"
 | With     -> "with"
 | LetEntry -> "let%entry"
+| MatchNat -> "match%nat"
 | EOF      -> "EOF"

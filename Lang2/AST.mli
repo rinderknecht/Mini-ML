@@ -306,11 +306,7 @@ and field_assignment = {
   field_expr : expr
 }
 
-and sequence = {
-  kwd_begin : kwd_begin;
-  sequence  : expr ssv;
-  kwd_end   : kwd_end
-}
+and sequence = expr injection
 
 and match_expr = kwd_match * expr * kwd_with * cases
 

@@ -81,9 +81,18 @@ type t =
 | True
 | Type
 | With
-| LetEntry
 
-  (* Virtual tokens *)
+  (* Liquidity specific *)
+
+| LetEntry
+| MatchNat
+(*
+| Contract
+| Sig
+| Struct
+*)
+
+(* Virtual tokens *)
 
 | EOF (* End of file *)
 

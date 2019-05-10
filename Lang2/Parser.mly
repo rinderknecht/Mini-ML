@@ -349,7 +349,18 @@ closed_if:
 match_expr(right_expr):
   reg(kwd(Match) expr kwd(With)
         option(sym(VBAR)) cases(right_expr) {
-          $1,$2,$3, ($4, Utils.nsepseq_rev $5) })                { $1 }
+          $1,$2,$3, ($4, Utils.nsepseq_rev $5) })
+| reg(match_nat(right_expr))                                     { $1 }
+
+match_nat(right_expr):
+  kwd(MatchNat) expr kwd(With)
+    option(sym(VBAR)) cases(right_expr) {
+    let open Region in
+    let cast_name = Name {region=ghost; value="assert_pos"} in
+    let cast_path = {module_proj=None; value_proj=cast_name,[]} in
+    let cast_fun  = Path {region=ghost; value=cast_path} in
+    let cast      = Call {region=ghost; value=cast_fun,$2}
+    in $1, cast, $3, ($4, Utils.nsepseq_rev $5) }
 
 cases(right_expr):
   case(right_expr)                                           { $1, [] }
@@ -391,9 +402,9 @@ comp_expr:
 | cat_expr                                                 {       $1 }
 
 cat_expr:
-  reg(cons_expr sym(CAT) cat_expr {$1,$2,$3})              {   Cat $1 }
-| reg(cons_expr sym(APPEND) cat_expr {$1,$2,$3})           { Append $1 }
-| cons_expr                                                {       $1 }
+  reg(cons_expr sym(CAT) cat_expr {$1,$2,$3})             {    Cat $1 }
+| reg(cons_expr sym(APPEND) cat_expr {$1,$2,$3})          { Append $1 }
+| cons_expr                                               {        $1 }
 
 cons_expr:
   reg(add_expr sym(CONS) cons_expr {$1,$2,$3})             {  Cons $1 }
@@ -465,5 +476,9 @@ field_assignment:
     {field_name=$1; assignment=$2; field_expr=$3} }
 
 sequence:
-  kwd(Begin) sepseq(expr,sym(SEMI)) kwd(End) {
-    {kwd_begin = $1; sequence = $2; kwd_end = $3} }
+  kwd(Begin) sep_or_term_list(expr,sym(SEMI)) kwd(End) {
+    let elements, terminator = $2 in
+    {opening = $1;
+     elements = Some elements;
+     terminator;
+     closing = $3} }

@@ -16,7 +16,6 @@ type kwd_fun   = Region.t
 type kwd_if    = Region.t
 type kwd_in    = Region.t
 type kwd_let   = Region.t
-type kwd_let_entry = Region.t
 type kwd_match = Region.t
 type kwd_mod   = Region.t
 type kwd_not   = Region.t
@@ -26,6 +25,7 @@ type kwd_then  = Region.t
 type kwd_true  = Region.t
 type kwd_type  = Region.t
 type kwd_with  = Region.t
+type kwd_let_entry = Region.t
 
 (* Symbols *)
 
@@ -290,11 +290,7 @@ and field_assignment = {
   field_expr : expr
 }
 
-and sequence = {
-  kwd_begin : kwd_begin;
-  sequence  : expr ssv;
-  kwd_end   : kwd_end
-}
+and sequence = expr injection
 
 and match_expr = kwd_match * expr * kwd_with * cases
 

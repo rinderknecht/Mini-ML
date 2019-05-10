@@ -69,6 +69,7 @@
 %token Type
 %token With
 %token LetEntry
+%token MatchNat
 
 %token EOF
 

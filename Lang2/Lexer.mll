@@ -79,6 +79,7 @@ let fail region value = raise (Error Region.{region; value})
 
 let keywords = Token.[
   "and",    Some And;
+  "begin",  Some Begin;
   "else",   Some Else;
   "false",  Some False;
   "fun",    Some Fun;
@@ -102,7 +103,6 @@ let keywords = Token.[
   "as",          None;
   "asr",         None;
   "assert",      None;
-  "begin",       None;
   "class",       None;
   "constraint",  None;
   "do",          None;
@@ -259,11 +259,12 @@ rule scan = parse
 | decimal as tz "tz" {
     match format_tz tz with
       Some z -> Token.Mtz (tz ^ "tz", z)
-    | None   -> sprintf "Invalid tez value." |> error lexbuf   }
+    | None   -> sprintf "Invalid tez amount." |> error lexbuf   }
 
 | uident  as id { Token.Constr id              }
 | "let%init"    { Token.Let                    }
 | "let%entry"   { Token.LetEntry               }
+| "match%nat"   { Token.MatchNat               }
 | ident   as id {
     match SMap.find id kwd_map with
       None -> sprintf "Reserved name \"%s\"." id |> error lexbuf
