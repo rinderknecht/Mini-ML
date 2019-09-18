@@ -8,6 +8,8 @@ Printexc.record_backtrace true;;
 
 let options = EvalOpt.read ()
 
+open EvalOpt
+
 (* Path to the Mini-ML standard library *)
 
 let lib_path =
