@@ -1,5 +1,7 @@
 (* Driver for the compiler and interpreter of Mini-ML *)
 
+open Region
+
 let sprintf = Printf.sprintf
 
 (* Error printing and exception tracing *)
@@ -7,12 +9,12 @@ let sprintf = Printf.sprintf
 let () = Printexc.record_backtrace true
 
 let runtime text region =
-  let msg = Lexer.format_error ~kind:"\nRuntime" (text, region)
-  in Utils.highlight msg
+  Lexer.format_error ~kind:"\nRuntime" Region.{value=text; region}
+  |> Utils.highlight
 
 let static text region =
-  let msg = Lexer.format_error ~kind:"\nStatic" (text, region)
-  in Utils.highlight msg
+  Lexer.format_error ~kind:"\nStatic" Region.{value=text; region}
+  |> Utils.highlight
 
 let internal text =
   Utils.highlight (sprintf "Internal error: %s" text); exit 1
@@ -76,7 +78,7 @@ let () =
 
     let _bv, fv = AST.vars ast in (* bv: bound vars; fv: free vars *)
     let () =
-      let apply (region, free_var) =
+      let apply Region.{region; value=free_var} =
         let msg = sprintf "Unbound variable \"%s\"." free_var
         in static msg region
       in AST.FreeVars.iter apply fv in
@@ -91,7 +93,7 @@ let () =
         ignore (Eval.eval ast) in
 
     (* Compiling Mini-ML to OCaml *)
-
+(*
     let () =
       match EvalOpt.compile with
              None -> ()
@@ -172,7 +174,7 @@ let () =
           (* Applying the edits *)
 
           List.iter (TEdit.apply desc) edits;
-          TEdit.close_out_desc io desc in
+          TEdit.close_out_desc io desc in *)
     ()
   with
   (* Lexing errors *)
@@ -183,10 +185,11 @@ let () =
   (* Parsing errors *)
 
   | Parser.Error ->
-      Lexer.prerr ~kind:"Syntactical"
-        ("Parse error.",
-         Region.make ~start:(Lexing.lexeme_start_p buffer)
-                     ~stop:(Lexing.lexeme_end_p buffer));
+      let region =
+        Region.make ~start:(Lexing.lexeme_start_p buffer |> Pos.from_byte)
+                    ~stop:(Lexing.lexeme_end_p buffer |> Pos.from_byte)
+      in Lexer.prerr ~kind:"Syntactical"
+                     Region.{value="Parse error."; region};
       exit 6
 
   (* Evaluation errors *)
@@ -195,13 +198,13 @@ let () =
       let msg = "Division by zero."
       in runtime msg reg; exit 7
 
-  | Eval.Nonlinear_pattern (_state,(region,x)) ->
-      let msg = sprintf "Repeated variable \"%s\" in pattern." x
+  | Eval.Nonlinear_pattern (_state,{region;value}) ->
+      let msg = sprintf "Repeated variable \"%s\" in pattern." value
       in runtime msg region; exit 7
 
-  | Eval.Multiple_decl (_state,(region,x)) ->
+  | Eval.Multiple_decl (_state,{region;value}) ->
       let msg = sprintf "Variable \"%s\" is bound several times \
-                                in this matching." x
+                                in this matching." value
       in runtime msg region; exit 7
 
   | Eval.Type_error (_state, info) ->
@@ -210,9 +213,9 @@ let () =
 
   (* Internal errors *)
 
-  | Eval.Env.Unbound (region,x) ->
+  | Eval.Env.Unbound {region;value} ->
       let msg = sprintf "Unbound variable \"%s\" (%s)."
-                   x (Region.to_string region)
+                        value (region#to_string `Point)
       in internal msg
 
   (* System errors *)

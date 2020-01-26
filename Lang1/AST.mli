@@ -13,7 +13,7 @@ open Utils
    denoting the _region_ of the occurrence of the keyword "and".
 *)
 
-type 'a reg = Region.t * 'a
+type 'a reg = 'a Region.reg
 
 (* Some keywords of OCaml *)
 
@@ -34,47 +34,47 @@ type kwd_with  = Region.t
 
 (* Symbols *)
 
-type arrow = Region.t                                                 (* "->" *)
-type cons  = Region.t                                                 (* "::" *)
-type cat   = Region.t                                                 (* "^"  *)
+type arrow = Region.t                                             (* "->" *)
+type cons  = Region.t                                             (* "::" *)
+type cat   = Region.t                                             (* "^"  *)
 
 (* Arithmetic operators *)
 
-type minus = Region.t                                                  (* "-" *)
-type plus  = Region.t                                                  (* "+" *)
-type div   = Region.t                                                  (* "/" *)
-type mult  = Region.t                                                  (* "*" *)
+type minus = Region.t                                              (* "-" *)
+type plus  = Region.t                                              (* "+" *)
+type div   = Region.t                                              (* "/" *)
+type mult  = Region.t                                              (* "*" *)
 
 (* Boolean operators *)
 
-type bool_or  = Region.t                                              (* "||" *)
-type bool_and = Region.t                                              (* "&&" *)
+type bool_or  = Region.t                                           (* "||" *)
+type bool_and = Region.t                                           (* "&&" *)
 
 (* Comparisons *)
 
-type eq = Region.t                                                    (* "="  *)
-type ne = Region.t                                                    (* "<>" *)
-type lt = Region.t                                                    (* "<"  *)
-type gt = Region.t                                                    (* ">"  *)
-type le = Region.t                                                    (* "=<" *)
-type ge = Region.t                                                    (* ">=" *)
+type eq = Region.t                                                (* "="  *)
+type ne = Region.t                                                (* "<>" *)
+type lt = Region.t                                                (* "<"  *)
+type gt = Region.t                                                (* ">"  *)
+type le = Region.t                                                (* "=<" *)
+type ge = Region.t                                                (* ">=" *)
 
 (* Compounds *)
 
-type lpar = Region.t                                                   (* "(" *)
-type rpar = Region.t                                                   (* ")" *)
-type lbra = Region.t                                                   (* "[" *)
-type rbra = Region.t                                                   (* "]" *)
+type lpar = Region.t                                               (* "(" *)
+type rpar = Region.t                                               (* ")" *)
+type lbra = Region.t                                               (* "[" *)
+type rbra = Region.t                                               (* "]" *)
 
 (* Separators *)
 
-type comma = Region.t                                                  (* "," *)
-type semi  = Region.t                                                  (* ";" *)
-type bar   = Region.t                                                  (* "|" *)
+type comma = Region.t                                              (* "," *)
+type semi  = Region.t                                              (* ";" *)
+type bar   = Region.t                                              (* "|" *)
 
 (* Wildcard *)
 
-type wild = Region.t                                                   (* "_" *)
+type wild = Region.t                                               (* "_" *)
 
 (* Literals *)
 
@@ -102,7 +102,6 @@ type unit__ = lpar * rpar
 
 type 'a bra = lbra * 'a * rbra
 
-
 (* The Abstract Syntax Tree (finally) *)
 
 type t  = statement list * eof
@@ -111,72 +110,72 @@ and ast = t
 and eof = Region.t
 
 and statement =
-                                       (* let p1 = e1 and p2 = e2 and ...     *)
+  (* let p1 = e1 and p2 = e2 and ...     *)
   Let     of (kwd_let * let_bindings) reg
-                                       (* let rec p1 = e1 and p2 = e2 and ... *)
+  (* let rec p1 = e1 and p2 = e2 and ... *)
 | LetRec  of (kwd_let * kwd_rec * let_rec_bindings) reg
 
-and let_bindings = (let_binding, kwd_and) nsepseq  (* p1 = e1 and p2 = e2 ... *)
+and let_bindings = (let_binding, kwd_and) nsepseq (* p1 = e1 and p2 = e2 ... *)
 
-and let_binding = pattern * eq * expr                                (* p = e *)
+and let_binding = pattern * eq * expr                             (* p = e *)
 
-and let_rec_bindings = (let_rec_binding,  kwd_and) nsepseq
+and let_rec_bindings = (let_rec_binding, kwd_and) nsepseq
 
 and let_rec_binding  = var reg * eq * fun_expr
 
 and pattern =
-  Ptuple of pattern csv reg                                  (* p1, p2, ...   *)
-| Plist  of pattern ssv bra reg                              (* [p1; p2; ...] *)
-| Pvar   of var reg                                          (*             x *)
-| Punit  of unit__ reg                                       (*            () *)
-| Pint   of Z.t reg                                          (*             7 *)
-| Ptrue  of kwd_true                                         (*          true *)
-| Pfalse of kwd_false                                        (*         false *)
-| Pstr   of string reg                                       (*      "string" *)
-| Pwild  of wild                                             (*             _ *)
-| Pcons  of (pattern * cons * pattern) reg                   (*      p1 :: p2 *)
-| Ppar   of pattern par reg                                  (*           (p) *)
+  Ptuple of pattern csv reg                               (* p1, p2, ...   *)
+| Plist  of pattern ssv bra reg                           (* [p1; p2; ...] *)
+| Pvar   of var reg                                       (*             x *)
+| Punit  of unit__ reg                                    (*            () *)
+| Pint   of Z.t reg                                       (*             7 *)
+| Ptrue  of kwd_true                                      (*          true *)
+| Pfalse of kwd_false                                     (*         false *)
+| Pstr   of string reg                                    (*      "string" *)
+| Pwild  of wild                                          (*             _ *)
+| Pcons  of (pattern * cons * pattern) reg                (*      p1 :: p2 *)
+| Ppar   of pattern par reg                               (*           (p) *)
 
 and expr =
-  LetExpr of let_expr reg       (* let [rec] p1 = e1 and p2 = e2 and ... in e *)
-| Fun     of fun_expr           (* fun x -> e                                 *)
-| If      of conditional reg    (* if e1 then e2 else e3                      *)
-| Tuple   of expr csv reg       (* e1, e2, ...                                *)
-| Match   of match_expr reg     (* p1 -> e1 | p2 -> e2 | ...                  *)
+  LetExpr of let_expr reg    (* let [rec] p1 = e1 and p2 = e2 and ... in e *)
+| Fun     of fun_expr        (* fun x -> e                                 *)
+| If      of conditional reg (* if e1 then e2 else e3                      *)
+| Tuple   of expr csv reg    (* e1, e2, ...                                *)
+| Match   of match_expr reg  (* p1 -> e1 | p2 -> e2 | ...                  *)
 
-| Cat     of (expr * cat * expr) reg                              (* e1  ^ e2 *)
-| Cons    of (expr * cons * expr) reg                             (* e1 :: e2 *)
+| Cat     of (expr * cat * expr) reg                           (* e1  ^ e2 *)
+| Cons    of (expr * cons * expr) reg                          (* e1 :: e2 *)
 
-| Or      of (expr * bool_or * expr) reg                          (* e1 || e2 *)
-| And     of (expr * bool_and * expr) reg                         (* e1 && e2 *)
+| Or      of (expr * bool_or * expr) reg                       (* e1 || e2 *)
+| And     of (expr * bool_and * expr) reg                      (* e1 && e2 *)
 
-| Lt      of (expr * lt * expr) reg                               (* e1  < e2 *)
-| LEq     of (expr * le * expr) reg                               (* e1 <= e2 *)
-| Gt      of (expr * gt * expr) reg                               (* e1  > e2 *)
-| GEq     of (expr * ge * expr) reg                               (* e1 >= e2 *)
-| NEq     of (expr * ne * expr) reg                               (* e1 <> e2 *)
-| Eq      of (expr * eq * expr) reg                               (* e1  = e2 *)
+| Lt      of (expr * lt * expr) reg                            (* e1  < e2 *)
+| LEq     of (expr * le * expr) reg                            (* e1 <= e2 *)
+| Gt      of (expr * gt * expr) reg                            (* e1  > e2 *)
+| GEq     of (expr * ge * expr) reg                            (* e1 >= e2 *)
+| NEq     of (expr * ne * expr) reg                            (* e1 <> e2 *)
+| Eq      of (expr * eq * expr) reg                            (* e1  = e2 *)
 
-| Add     of (expr * plus   * expr) reg                           (* e1  + e2 *)
-| Sub     of (expr * minus  * expr) reg                           (* e1  - e2 *)
+| Add     of (expr * plus   * expr) reg                        (* e1  + e2 *)
+| Sub     of (expr * minus  * expr) reg                        (* e1  - e2 *)
 
-| Mult    of (expr * mult    * expr) reg                         (* e1  *  e2 *)
-| Div     of (expr * div     * expr) reg                         (* e1  /  e2 *)
-| Mod     of (expr * kwd_mod * expr) reg                         (* e1 mod e2 *)
+| Mult    of (expr * mult    * expr) reg                      (* e1  *  e2 *)
+| Div     of (expr * div     * expr) reg                      (* e1  /  e2 *)
+| Mod     of (expr * kwd_mod * expr) reg                      (* e1 mod e2 *)
 
-| Neg     of (minus   * expr) reg                                    (*    -e *)
-| Not     of (kwd_not * expr) reg                                    (* not e *)
+| Neg     of (minus   * expr) reg                                 (*    -e *)
+| Not     of (kwd_not * expr) reg                                 (* not e *)
 
-| Call    of (expr * expr) reg                                         (* f e *)
+| Call    of (expr * expr) reg                                      (* f e *)
 
-| Int     of Z.t reg                                         (* 12345         *)
-| Var     of var reg                                         (* x             *)
-| Str     of string reg                                      (* "foo"         *)
-| Unit    of unit__ reg                                      (* ()            *)
-| True    of kwd_true                                        (* true          *)
-| False   of kwd_false                                       (* false         *)
-| Par     of expr par reg                                    (* (e)           *)
-| List    of expr ssv bra reg                                (* [e1; e2; ...] *)
+| Int     of Z.t reg                                      (* 12345         *)
+| Var     of var reg                                      (* x             *)
+| Str     of string reg                                   (* "foo"         *)
+| Unit    of unit__ reg                                   (* ()            *)
+| True    of kwd_true                                     (* true          *)
+| False   of kwd_false                                    (* false         *)
+| Par     of expr par reg                                 (* (e)           *)
+| List    of expr ssv bra reg                             (* [e1; e2; ...] *)
 | Extern  of extern
 
 and match_expr = kwd_match * expr * kwd_with * cases
@@ -197,20 +196,20 @@ and extern =
   Cast   of cast_expr
 | Print  of print_expr
 | Scanf  of scanf_expr
-| PolyEq of (var * var)                             (* polymorphic equality *)
+| PolyEq of (var * var)                           (* polymorphic equality *)
 
 and cast_expr =
-  StringOfInt  of var                                     (* string_of_int  x *)
-| StringOfBool of var                                     (* string_of_bool x *)
+  StringOfInt  of var                                 (* string_of_int  x *)
+| StringOfBool of var                                 (* string_of_bool x *)
 
 and print_expr =
-  PrintString of var                                        (* print_string x *)
-| PrintInt    of var                                        (* print_int    x *)
+  PrintString of var                                    (* print_string x *)
+| PrintInt    of var                                    (* print_int    x *)
 
 and scanf_expr =
-  ScanfString of var                                        (* scanf_string x *)
-| ScanfInt    of var                                        (* scanf_int    x *)
-| ScanfBool   of var                                        (* scanf_bool   x *)
+  ScanfString of var                                    (* scanf_string x *)
+| ScanfInt    of var                                    (* scanf_int    x *)
+| ScanfBool   of var                                    (* scanf_bool   x *)
 
 
 (* Normalising nodes of the AST so the interpreter is more uniform and
@@ -263,9 +262,8 @@ and scanf_expr =
    "fun" keyword.
 *)
 
-type sep = Region.t
-
-val norm: ?reg:(Region.t * kwd_fun) -> pattern nseq -> sep -> expr -> fun_expr
+val norm :
+  ?reg:(Region.t * kwd_fun) -> pattern nseq -> Region.t -> expr -> fun_expr
 
 (* Undoing the above rewritings (for debugging by comparison with the
    lexer, and to feed the source-to-source transformations with only

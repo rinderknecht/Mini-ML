@@ -39,10 +39,11 @@ let () =
     Lexer.Error diag ->
       close_in cin; Lexer.prerr ~kind:"Lexical" diag
   | Parser.Error ->
+    let region =
+      Region.make
+        ~start:(Lexing.lexeme_start_p buffer |> Pos.from_byte)
+        ~stop:(Lexing.lexeme_end_p buffer |> Pos.from_byte) in
       close_in cin;
       Lexer.prerr ~kind:"Syntactical"
-                  ("Parse error.",
-                   Region.make
-                     ~start:(Lexing.lexeme_start_p buffer)
-                     ~stop:(Lexing.lexeme_end_p buffer))
-  | Sys_error msg -> Utils.highlight msg
+                  Region.{value="Parse error."; region}
+| Sys_error msg -> Utils.highlight msg

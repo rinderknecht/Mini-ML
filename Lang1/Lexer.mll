@@ -7,17 +7,18 @@ open! Utils
 
 (* Lexical errors *)
 
-type 'a reg = 'a * Region.t
+type 'a reg = 'a Region.reg
 type message = string
 type diagnostic = message reg
 
 exception Error of diagnostic
 
 let error lexbuf msg =
-  let start  = Lexing.lexeme_start_p lexbuf
-  and stop   = Lexing.lexeme_end_p   lexbuf in
+  let start  = Lexing.lexeme_start_p lexbuf |> Pos.from_byte
+  and stop   = Lexing.lexeme_end_p   lexbuf |> Pos.from_byte in
   let region = Region.make ~start ~stop
-  in raise (Error (msg, region))
+  and value  = msg
+  in raise (Error Region.{value; region})
 
 (* Keywords *)
 
@@ -202,8 +203,8 @@ rule scan = parse
         in error lexbuf msg
   }
 
-| "(*" { let start = Lexing.lexeme_start_p lexbuf
-         and stop  = Lexing.lexeme_end_p   lexbuf
+| "(*" { let start = Lexing.lexeme_start_p lexbuf |> Pos.from_byte
+         and stop  = Lexing.lexeme_end_p   lexbuf |> Pos.from_byte
          in scan_comment start stop lexbuf;
          scan lexbuf }
 
@@ -214,15 +215,15 @@ rule scan = parse
 (* Comments *)
 
 and scan_comment start stop = parse
-  "(*"    { let start' = Lexing.lexeme_start_p lexbuf
-            and stop'  = Lexing.lexeme_end_p   lexbuf
+  "(*"    { let start' = Lexing.lexeme_start_p lexbuf |> Pos.from_byte
+            and stop'  = Lexing.lexeme_end_p   lexbuf |> Pos.from_byte
             in scan_comment start' stop' lexbuf;
                scan_comment start  stop  lexbuf }
 | "*)"    { () }
 | newline { Lexing.new_line lexbuf;
             scan_comment start stop lexbuf }
 | eof     { let region = Region.make ~start ~stop
-            in raise (Error ("Open comment.", region)) }
+            in raise (Error Region.{value="Open comment."; region}) }
 | '"' string '"'
 | _       { scan_comment start stop lexbuf }
 
@@ -242,9 +243,9 @@ let get_token ?log =
 
 (* Standalone lexer for debugging purposes *)
 
-let format_error ~(kind: string) (msg, region) =
+let format_error ~(kind: string) Region.{value=msg; region} =
   Printf.sprintf "%s error in %s:\n%s%!"
-    kind (Region.to_string region) msg
+    kind (region#to_string `Point) msg
 
 let prerr ~(kind: string) msg =
   highlight (format_error ~kind msg)
@@ -254,10 +255,11 @@ type file_path = string
 let output_token buffer chan token =
   let open Lexing in
   let conc = Token.to_string token in
-  let start_pos = buffer.lex_start_p
-  and curr_pos  = buffer.lex_curr_p
+  let start_pos = buffer.lex_start_p |> Pos.from_byte
+  and curr_pos  = buffer.lex_curr_p |> Pos.from_byte
   in Printf.fprintf chan "%s-%s: %s\n%!"
-       (Pos.compact start_pos) (Pos.compact curr_pos) conc
+      (start_pos#compact `Point)
+      (curr_pos#compact `Point) conc
 
 let iter action file_opt =
   try
@@ -271,8 +273,9 @@ let iter action file_opt =
         let t = scan buffer in
         action buffer stdout t;
         if t = Token.EOF then (close_in cin; close_out stdout) else iter ()
-      with Error diag ->
-             close_in cin; close_out stdout; prerr ~kind:"Lexical" diag
+      with
+        Error diag ->
+          close_in cin; close_out stdout; prerr ~kind:"Lexical" diag
     in reset buffer; iter ()
   with Sys_error msg -> highlight msg
 

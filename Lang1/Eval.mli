@@ -91,7 +91,9 @@ module rec Env : sig
 
   val empty     : t
   val add       : rvar -> Value.t -> t -> t
+  val add_id    : var -> Value.t -> t -> t
   val find      : rvar -> t -> Value.t
+  val find_id   : var -> t -> Value.t
   val mem       : rvar -> t -> bool
   val union     : (Value.t -> Value.t -> Value.t option) -> t -> t -> t
   val fold      : (string -> Value.t -> 'a -> 'a) -> t -> 'a -> 'a
@@ -121,11 +123,21 @@ end
 
 (* State *)
 
-and State : sig
-  type thread = < >
-  type t = {env: Env.t; thread: thread}
-  type state = t
-end
+and State :
+  sig
+    type thread = < >
+
+    type t = <
+      env        : Env.t;
+      thread     : thread;
+      set_env    : Env.t -> t;
+      set_thread : thread -> t
+    >
+
+    type state = t
+
+    val make : env:Env.t -> thread:thread -> t
+  end
 
 (* Errors *)
 

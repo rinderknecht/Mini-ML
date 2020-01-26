@@ -2,7 +2,7 @@
 
 (* Error reporting *)
 
-type 'a reg = 'a * Region.t
+type 'a reg = 'a Region.reg
 type message = string
 type diagnostic = message reg
 

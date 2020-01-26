@@ -2,3 +2,9 @@ $HOME/git/OCaml-build/Makefile
 
 $HOME/git/UnionFind/Partition.mli
 $HOME/git/UnionFind/Partition3.ml
+$HOME/git/Text_editing/Edit.mli
+$HOME/git/Text_editing/Edit.mll
+$HOME/git/Source_locations/Pos.mli
+$HOME/git/Source_locations/Pos.ml
+$HOME/git/Source_locations/Region.mli
+$HOME/git/Source_locations/Region.ml
