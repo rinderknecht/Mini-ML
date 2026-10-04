@@ -27,7 +27,6 @@ type kwd_fun   = Region.t
 type kwd_if    = Region.t
 type kwd_in    = Region.t
 type kwd_let   = Region.t
-type kwd_let_entry = Region.t
 type kwd_match = Region.t
 type kwd_mod   = Region.t
 type kwd_not   = Region.t
@@ -136,10 +135,8 @@ and ast = t
 and eof = Region.t
 
 and statement =
-                                                    (* let p = e and ...     *)
-  Let      of (kwd_let * let_bindings) reg
-                                                    (* let%entry p = e and ... *)
-| LetEntry of (kwd_let_entry * let_binding) reg
+    Let      of (kwd_let * let_bindings) reg        (* let p = e and ...     *)
+
                                                     (* let rec p = e and ... *)
 | LetRec   of (kwd_let * kwd_rec * let_rec_bindings) reg
 | TypeDecl of type_decl reg                                     (* type .... *)

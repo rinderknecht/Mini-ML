@@ -133,7 +133,6 @@ program:
 
 statement:
   reg(kwd(Let)          let_bindings     {$1,$2})       {      Let $1 }
-| reg(kwd(LetEntry)     let_binding      {$1,$2})       { LetEntry $1 }
 | reg(kwd(Let) kwd(Rec) let_rec_bindings {$1,$2,$3})    {   LetRec $1 }
 | reg(type_decl)                                        { TypeDecl $1 }
 

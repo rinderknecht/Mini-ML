@@ -25,7 +25,6 @@ type kwd_then  = Region.t
 type kwd_true  = Region.t
 type kwd_type  = Region.t
 type kwd_with  = Region.t
-type kwd_let_entry = Region.t
 
 (* Symbols *)
 
@@ -125,7 +124,6 @@ and eof = Region.t
 
 and statement =
   Let      of (kwd_let * let_bindings) reg
-| LetEntry of (kwd_let_entry * let_binding) reg
 | LetRec   of (kwd_let * kwd_rec * let_rec_bindings) reg
 | TypeDecl of type_decl reg
 
@@ -361,8 +359,6 @@ let rec to_string (statements,_) =
 and statement_to_string = function
   Let {value=_,let_bindings; _} ->
     sprintf "Let %s" (let_bindings_to_string let_bindings)
-| LetEntry {value=_,let_binding; _} ->
-    sprintf "Let%%entry %s" (let_binding_to_string let_binding)
 | LetRec {value=_,_,let_rec_bindings; _} ->
     sprintf "LetRec %s" (let_rec_bindings_to_string let_rec_bindings)
 | TypeDecl {value=type_decl; _} ->
@@ -669,9 +665,6 @@ and print_statement undo = function
   Let {value=kwd_let, let_bindings; _} ->
     print_token kwd_let "let";
     print_let_bindings undo let_bindings
-| LetEntry {value=kwd_let_entry, let_binding; _} ->
-    print_token kwd_let_entry "let%entry";
-    print_let_binding undo let_binding
 | LetRec {value=kwd_let, kwd_rec, let_rec_bindings; _} ->
     print_token kwd_let "let";
     print_token kwd_rec "rec";
@@ -867,7 +860,6 @@ let rec vars env (statements,_) =
 
 and fv_statement state = function
   Let    {value=_, bindings; _}   -> fv_let_bindings state bindings
-| LetEntry {value=_, binding; _}   -> fv_let_bindings state (binding,[])
 | LetRec {value =_,_,bindings; _} -> fv_let_rec_bindings state bindings
 
 and fv_let_bindings (env, _ as state) bindings =
